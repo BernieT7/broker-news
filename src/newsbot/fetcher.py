@@ -1,6 +1,3 @@
-下面是目前工作區裡最新的 `src/newsbot/fetcher.py`，你可以整段複製：
-
-```python
 from __future__ import annotations
 
 import re
