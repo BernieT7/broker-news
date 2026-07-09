@@ -561,4 +561,3 @@ def _importance_score(title: str, summary: str) -> int:
 
 def _count_hits(lower_text: str, keywords: list[str]) -> int:
     return sum(1 for keyword in keywords if keyword.lower() in lower_text)
-```
