@@ -1,3 +1,6 @@
+下面是目前工作區裡最新的 `src/newsbot/fetcher.py`，你可以整段複製：
+
+```python
 from __future__ import annotations
 
 import re
@@ -561,3 +564,4 @@ def _importance_score(title: str, summary: str) -> int:
 
 def _count_hits(lower_text: str, keywords: list[str]) -> int:
     return sum(1 for keyword in keywords if keyword.lower() in lower_text)
+```
