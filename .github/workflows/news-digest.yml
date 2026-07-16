@@ -1,0 +1,32 @@
+name: Brokerage News Digest
+
+on:
+  schedule:
+    # 07:00 Asia/Taipei = 23:00 UTC on the previous calendar day.
+    # Change this to "0 23 * * 0" if you only want Monday morning in Taiwan.
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send digest
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          DIGEST_LOOKBACK_HOURS: "168"
+        run: PYTHONPATH=src python -m newsbot.main
