@@ -38,7 +38,7 @@ def _fetch_with_retries(settings: Settings):
             time.sleep(delay)
 
         print(f"Fetch attempt {attempt + 1}/{total_attempts}")
-        candidates = fetch_articles(settings.lookback_hours)[: settings.max_articles]
+        candidates = fetch_articles(settings.lookback_hours)
         print(f"Candidate articles after filtering: {len(candidates)}")
         if candidates:
             return candidates

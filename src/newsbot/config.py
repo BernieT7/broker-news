@@ -21,12 +21,10 @@ class Settings:
     email_from: str
     email_to: list[str]
     lookback_hours: int
-    max_articles: int
     retry_delays: list[int]
 
     @classmethod
     def from_env(cls) -> "Settings":
-        max_articles = os.getenv("DIGEST_MAX_ARTICLES") or os.getenv("DIGEST_MAX_CANDIDATES", "10")
         return cls(
             smtp_host=os.getenv("SMTP_HOST", ""),
             smtp_port=int(os.getenv("SMTP_PORT", "587")),
@@ -34,8 +32,7 @@ class Settings:
             smtp_password=os.getenv("SMTP_PASSWORD", ""),
             email_from=os.getenv("EMAIL_FROM", ""),
             email_to=_split_csv(os.getenv("EMAIL_TO", "")),
-            lookback_hours=int(os.getenv("DIGEST_LOOKBACK_HOURS", "24")),
-            max_articles=int(max_articles),
+            lookback_hours=int(os.getenv("DIGEST_LOOKBACK_HOURS", "168")),
             retry_delays=_split_int_csv(os.getenv("DIGEST_RETRY_DELAYS", "30,60")),
         )
 
