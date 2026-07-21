@@ -771,6 +771,10 @@ INDIVIDUAL_TRADING_STATUS_KEYWORDS = [
     "恢復買賣",
     "停止買賣",
     "暫停買賣",
+    "終止買賣",
+    "終止興櫃",
+    "終止興櫃買賣",
+    "興櫃買賣",
     "恢復在證券商營業處所買賣",
     "證券商營業處所買賣",
     "恢復為普通交割",
@@ -793,6 +797,28 @@ TRADING_STATUS_STRATEGY_EXCEPTION_KEYWORDS = [
     "rule changes",
     "market reform",
     "market structure",
+]
+
+PLATFORM_MARKET_RECAP_SOURCES = [
+    "富途牛牛",
+    "futu niuniu",
+    "moomoo",
+]
+
+PLATFORM_MARKET_RECAP_KEYWORDS = [
+    "what has happened",
+    "following each",
+    "after each",
+    "symposiums on market stabilization",
+    "symposium on market stabilization",
+    "market stabilization",
+    "capital markets following",
+    "市場穩定",
+    "穩市座談",
+    "座談會後",
+    "市場怎麼走",
+    "市場表現",
+    "行情回顧",
 ]
 
 HARD_EXCLUDE_PATTERNS = [
@@ -2480,6 +2506,9 @@ def _is_relevant(
     if _is_individual_trading_status_announcement(lower_text):
         return False
 
+    if _is_platform_market_recap(lower_title, lower_text, source):
+        return False
+
     if _is_individual_investor_alert(lower_title, lower_text, lower_url, source):
         return False
 
@@ -2666,11 +2695,54 @@ def _is_broker_commentary_on_non_broker_industry(lower_title: str, lower_text: s
 
 
 def _is_individual_trading_status_announcement(lower_text: str) -> bool:
+    terminal_status_hit = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "終止興櫃買賣",
+            "終止興櫃",
+            "終止買賣",
+        ]
+    )
+    if terminal_status_hit and not any(
+        _contains_keyword(lower_text, keyword) for keyword in TRADING_STATUS_STRATEGY_EXCEPTION_KEYWORDS
+    ):
+        return True
+
     status_hits = sum(1 for keyword in INDIVIDUAL_TRADING_STATUS_KEYWORDS if _contains_keyword(lower_text, keyword))
     if status_hits < 2:
         return False
 
     return not any(_contains_keyword(lower_text, keyword) for keyword in TRADING_STATUS_STRATEGY_EXCEPTION_KEYWORDS)
+
+
+def _is_platform_market_recap(lower_title: str, lower_text: str, source: str) -> bool:
+    lower_source = source.lower()
+    combined = f"{lower_title}\n{lower_text}\n{lower_source}"
+    platform_hit = any(keyword in combined for keyword in PLATFORM_MARKET_RECAP_SOURCES)
+    if not platform_hit:
+        return False
+
+    recap_hit = any(_contains_keyword(combined, keyword) for keyword in PLATFORM_MARKET_RECAP_KEYWORDS)
+    if not recap_hit:
+        return False
+
+    return not any(
+        _contains_keyword(combined, keyword)
+        for keyword in [
+            "new rule",
+            "new rules",
+            "rule change",
+            "new policy",
+            "policy change",
+            "market-entry regime",
+            "market entry",
+            "license",
+            "licensing",
+            "政策",
+            "新規",
+            "牌照",
+        ]
+    )
 
 
 def _product_event_level(title: str, summary: str, source: str) -> int | None:
