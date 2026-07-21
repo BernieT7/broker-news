@@ -28,5 +28,5 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          DIGEST_LOOKBACK_HOURS: "168"
+          DIGEST_LOOKBACK_HOURS: "24"
         run: PYTHONPATH=src python -m newsbot.main
