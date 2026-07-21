@@ -683,6 +683,118 @@ CORPORATE_FILING_STRATEGY_EXCEPTION_KEYWORDS = [
     "withdrawal wave",
 ]
 
+BROKER_EARNINGS_NOISE_KEYWORDS = [
+    "earnings",
+    "quarterly results",
+    "quarterly earnings",
+    "profit",
+    "profits",
+    "revenue",
+    "stock",
+    "stocks",
+    "shares",
+    "bull market",
+    "bear market",
+    "how that will impact earnings",
+    "財報",
+    "獲利",
+    "營收",
+    "股價",
+    "股票",
+]
+
+BROKER_EARNINGS_STRATEGY_EXCEPTION_KEYWORDS = [
+    "launch",
+    "launches",
+    "expand",
+    "expands",
+    "partnership",
+    "partners",
+    "platform",
+    "regulation",
+    "regulatory",
+    "market structure",
+    "settlement",
+    "clearing",
+    "tokenization",
+    "tokenized securities",
+    "RWA",
+    "STO",
+    "推出",
+    "上線",
+    "擴張",
+    "合作",
+    "平台",
+    "監管",
+    "法規",
+    "交易制度",
+    "交割",
+    "清算",
+    "代幣化",
+    "證券型代幣",
+]
+
+BROKER_COMMENTARY_MARKERS = [
+    "券商：",
+    "券商:",
+    "券商表示",
+    "券商指出",
+    "券商認為",
+    "券商看好",
+    "券商研報",
+    "broker says",
+    "brokerage says",
+    "brokerage sees",
+    "analysts at",
+]
+
+NON_BROKER_INDUSTRY_COMMENTARY_KEYWORDS = [
+    "AI",
+    "ai",
+    "半導體",
+    "記憶體",
+    "晶片",
+    "科技股",
+    "主權AI",
+    "中東主權AI",
+    "memory",
+    "semiconductor",
+    "chip",
+    "chips",
+    "commodity",
+    "commodities",
+    "原物料",
+]
+
+INDIVIDUAL_TRADING_STATUS_KEYWORDS = [
+    "公告本公司",
+    "恢復買賣",
+    "停止買賣",
+    "暫停買賣",
+    "恢復在證券商營業處所買賣",
+    "證券商營業處所買賣",
+    "恢復為普通交割",
+    "普通交割",
+    "變更交易方法",
+    "恢復融資融券",
+    "融資融券交易",
+]
+
+TRADING_STATUS_STRATEGY_EXCEPTION_KEYWORDS = [
+    "交易制度",
+    "上市規則",
+    "上櫃規則",
+    "市場改革",
+    "制度調整",
+    "多家公司",
+    "多家上市公司",
+    "多家上櫃公司",
+    "rule change",
+    "rule changes",
+    "market reform",
+    "market structure",
+]
+
 HARD_EXCLUDE_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
@@ -2359,6 +2471,15 @@ def _is_relevant(
     ):
         return False
 
+    if _is_broker_earnings_or_stock_news(lower_text):
+        return False
+
+    if _is_broker_commentary_on_non_broker_industry(lower_title, lower_text):
+        return False
+
+    if _is_individual_trading_status_announcement(lower_text):
+        return False
+
     if _is_individual_investor_alert(lower_title, lower_text, lower_url, source):
         return False
 
@@ -2517,6 +2638,39 @@ def _is_individual_corporate_filing(lower_text: str) -> bool:
 
 def _has_corporate_filing_strategy_exception(lower_text: str) -> bool:
     return any(_contains_keyword(lower_text, keyword) for keyword in CORPORATE_FILING_STRATEGY_EXCEPTION_KEYWORDS)
+
+
+def _is_broker_earnings_or_stock_news(lower_text: str) -> bool:
+    if not any(_contains_keyword(lower_text, keyword) for keyword in BROKERAGE_NAMES):
+        return False
+
+    if not any(_contains_keyword(lower_text, keyword) for keyword in BROKER_EARNINGS_NOISE_KEYWORDS):
+        return False
+
+    return not any(
+        _contains_keyword(lower_text, keyword) for keyword in BROKER_EARNINGS_STRATEGY_EXCEPTION_KEYWORDS
+    )
+
+
+def _is_broker_commentary_on_non_broker_industry(lower_title: str, lower_text: str) -> bool:
+    if not any(marker.lower() in lower_title for marker in BROKER_COMMENTARY_MARKERS):
+        return False
+
+    if not any(_contains_keyword(lower_text, keyword) for keyword in NON_BROKER_INDUSTRY_COMMENTARY_KEYWORDS):
+        return False
+
+    return not any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in MARKET_RULE_CORE_TERMS + BROKER_EARNINGS_STRATEGY_EXCEPTION_KEYWORDS
+    )
+
+
+def _is_individual_trading_status_announcement(lower_text: str) -> bool:
+    status_hits = sum(1 for keyword in INDIVIDUAL_TRADING_STATUS_KEYWORDS if _contains_keyword(lower_text, keyword))
+    if status_hits < 2:
+        return False
+
+    return not any(_contains_keyword(lower_text, keyword) for keyword in TRADING_STATUS_STRATEGY_EXCEPTION_KEYWORDS)
 
 
 def _product_event_level(title: str, summary: str, source: str) -> int | None:

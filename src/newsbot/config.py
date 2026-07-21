@@ -32,7 +32,7 @@ class Settings:
             smtp_password=os.getenv("SMTP_PASSWORD", ""),
             email_from=os.getenv("EMAIL_FROM", ""),
             email_to=_split_csv(os.getenv("EMAIL_TO", "")),
-            lookback_hours=int(os.getenv("DIGEST_LOOKBACK_HOURS", "168")),
+            lookback_hours=int(os.getenv("DIGEST_LOOKBACK_HOURS", "24")),
             retry_delays=_split_int_csv(os.getenv("DIGEST_RETRY_DELAYS", "30,60")),
         )
 
