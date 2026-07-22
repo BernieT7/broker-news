@@ -845,6 +845,10 @@ CRYPTO_PRODUCT_NOISE_KEYWORDS = [
     "主網上線",
     "mainnet",
     "chain TVL",
+    "Robinhood Chain",
+    "self-custodial trading platform",
+    "self-custodial",
+    "代幣化股票",
     "launches tokenized stocks",
 ]
 
@@ -899,11 +903,30 @@ LOW_VALUE_REGULATOR_MARKET_KEYWORDS = [
     "獨董賦能",
     "銀行獨董",
     "強化調查權",
+    "碳排放交易",
+    "碳排放交易制度",
+    "carbon emissions trading",
+    "emissions trading",
+    "違約交割",
+    "違約買賣",
+    "申報違約買賣",
+    "違約買賣總額",
+    "創今年第",
+    "得獎",
+    "榜單",
+    "named among",
+    "top fintech companies",
+    "world's top fintech",
+    "PR Newswire",
+    "where retail investing is headed",
+    "thought leadership",
+    "全能交易所",
+    "預測市場",
+    "prediction market",
+    "prediction markets",
 ]
 
 LOW_VALUE_REGULATOR_EXCEPTION_KEYWORDS = [
-    "券商",
-    "證券商",
     "交易制度",
     "市場制度",
     "系統出包",
@@ -912,8 +935,6 @@ LOW_VALUE_REGULATOR_EXCEPTION_KEYWORDS = [
     "錯帳",
     "限制業務",
     "market structure",
-    "brokerage",
-    "broker-dealer",
 ]
 
 HARD_EXCLUDE_PATTERNS = [
@@ -2883,12 +2904,66 @@ def _is_non_core_crypto_product_news(lower_text: str) -> bool:
     if not any(_contains_keyword(lower_text, keyword) for keyword in CRYPTO_PRODUCT_NOISE_KEYWORDS):
         return False
 
-    return not any(_contains_keyword(lower_text, keyword) for keyword in CORE_PRODUCT_STRATEGY_ACTION_KEYWORDS)
+    return not _has_core_product_strategy_action(lower_text)
+
+
+def _has_core_product_strategy_action(lower_text: str) -> bool:
+    regulatory_account_access = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["regulatory approval", "approved", "approval", "監管核准", "主管機關核准"]
+    ) and any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "omnibus brokerage accounts",
+            "brokerage accounts",
+            "brokerage account",
+            "individual investors",
+            "券商帳戶",
+            "證券帳戶",
+            "投資人資格",
+        ]
+    )
+    if regulatory_account_access:
+        return True
+
+    named_market_infrastructure = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["London Stock Exchange", "LSE", "DTCC", "clearing house", "清算機構", "交易所"]
+    ) and any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "trading venue",
+            "market infrastructure",
+            "on-chain settlement",
+            "on-chain clearing",
+            "securities settlement",
+            "clearing and settlement",
+            "鏈上結算",
+            "鏈上交割",
+            "清算交割",
+        ]
+    )
+    if named_market_infrastructure:
+        return True
+
+    broker_market_entry = any(
+        _contains_keyword(lower_text, keyword) for keyword in ["market-entry regime", "market entry", "市場進入"]
+    ) and any(_contains_keyword(lower_text, keyword) for keyword in BROKERAGE_NAMES + BROKERAGE_CORE_TERMS)
+    if broker_market_entry:
+        return True
+
+    return False
 
 
 def _is_low_value_regulator_or_market_item(lower_text: str) -> bool:
     if not any(_contains_keyword(lower_text, keyword) for keyword in LOW_VALUE_REGULATOR_MARKET_KEYWORDS):
         return False
+
+    if any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["碳排放交易", "碳排放交易制度", "carbon emissions trading", "emissions trading"]
+    ):
+        return True
 
     if any(_contains_keyword(lower_text, keyword) for keyword in LOW_VALUE_REGULATOR_EXCEPTION_KEYWORDS):
         return False
