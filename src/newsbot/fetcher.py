@@ -696,6 +696,8 @@ BROKER_EARNINGS_NOISE_KEYWORDS = [
     "bull market",
     "bear market",
     "how that will impact earnings",
+    "trading at a discount",
+    "at a discount",
     "財報",
     "獲利",
     "營收",
@@ -764,6 +766,10 @@ NON_BROKER_INDUSTRY_COMMENTARY_KEYWORDS = [
     "commodity",
     "commodities",
     "原物料",
+    "韓股",
+    "景氣",
+    "市場焦點",
+    "memory chip",
 ]
 
 INDIVIDUAL_TRADING_STATUS_KEYWORDS = [
@@ -819,6 +825,95 @@ PLATFORM_MARKET_RECAP_KEYWORDS = [
     "市場怎麼走",
     "市場表現",
     "行情回顧",
+]
+
+CRYPTO_PRODUCT_NOISE_KEYWORDS = [
+    "DEX",
+    "dex",
+    "DeFi",
+    "defi",
+    "TVL",
+    "tvl",
+    "Solana token",
+    "Solana 代幣",
+    "代幣交易",
+    "token trading",
+    "perpetual futures",
+    "perpetual",
+    "perpetuals",
+    "永續合約",
+    "主網上線",
+    "mainnet",
+    "chain TVL",
+    "launches tokenized stocks",
+]
+
+CORE_PRODUCT_STRATEGY_ACTION_KEYWORDS = [
+    "regulatory approval",
+    "regulatory approved",
+    "approved",
+    "approval",
+    "market-entry regime",
+    "omnibus brokerage accounts",
+    "brokerage accounts",
+    "brokerage account",
+    "broker adoption",
+    "brokerage platform",
+    "exchange",
+    "clearing",
+    "settlement",
+    "on-chain settlement",
+    "on-chain clearing",
+    "securities settlement",
+    "trading venue",
+    "market infrastructure",
+    "London Stock Exchange",
+    "DTCC",
+    "金管會核准",
+    "主管機關核准",
+    "監管核准",
+    "券商帳戶",
+    "券商採用",
+    "證券帳戶",
+    "交易所",
+    "清算",
+    "交割",
+    "鏈上結算",
+    "鏈上交割",
+    "市場基礎設施",
+]
+
+LOW_VALUE_REGULATOR_MARKET_KEYWORDS = [
+    "投資人先設",
+    "風險提醒",
+    "被砍倉",
+    "上市案證交所通過",
+    "上市案",
+    "ETF 零股",
+    "ETF零股",
+    "ETF trading",
+    "commission-free ETF",
+    "commission-free ETF trading",
+    "minimum investment",
+    "人氣旺",
+    "獨董賦能",
+    "銀行獨董",
+    "強化調查權",
+]
+
+LOW_VALUE_REGULATOR_EXCEPTION_KEYWORDS = [
+    "券商",
+    "證券商",
+    "交易制度",
+    "市場制度",
+    "系統出包",
+    "系統當機",
+    "下單",
+    "錯帳",
+    "限制業務",
+    "market structure",
+    "brokerage",
+    "broker-dealer",
 ]
 
 HARD_EXCLUDE_PATTERNS = [
@@ -2449,6 +2544,18 @@ def _event_key(title: str) -> str | None:
     ):
         return "tw_fsc_h1_penalty_statistics"
 
+    taishin_system_terms = ["台新證", "台新證券", "系統", "app", "下單", "錯帳", "當機", "出包", "災情"]
+    taishin_penalty_terms = ["金管會", "裁罰", "重罰", "360萬", "360 萬", "限制", "史上最高", "最重罰"]
+    if any(keyword.lower() in lower_title for keyword in taishin_system_terms) and any(
+        keyword.lower() in lower_title for keyword in taishin_penalty_terms
+    ):
+        return "tw_taishin_securities_system_penalty"
+
+    if "券商" in title and "系統" in title and any(
+        keyword in title for keyword in ["金管會", "裁罰", "重罰", "360萬", "360 萬", "史上最高", "最重罰"]
+    ):
+        return "tw_taishin_securities_system_penalty"
+
     if ("金管會" in title or "金融" in title) and (
         "ai攻擊" in compact_title or "金融資安" in title or ("打敗" in title and "AI" in title)
     ):
@@ -2507,6 +2614,12 @@ def _is_relevant(
         return False
 
     if _is_platform_market_recap(lower_title, lower_text, source):
+        return False
+
+    if _is_non_core_crypto_product_news(lower_text):
+        return False
+
+    if _is_low_value_regulator_or_market_item(lower_text):
         return False
 
     if _is_individual_investor_alert(lower_title, lower_text, lower_url, source):
@@ -2682,7 +2795,14 @@ def _is_broker_earnings_or_stock_news(lower_text: str) -> bool:
 
 
 def _is_broker_commentary_on_non_broker_industry(lower_title: str, lower_text: str) -> bool:
-    if not any(marker.lower() in lower_title for marker in BROKER_COMMENTARY_MARKERS):
+    marker_hit = any(marker.lower() in lower_title for marker in BROKER_COMMENTARY_MARKERS) or any(
+        [
+            re.search(r"券商[^：:]{0,40}[：:]", lower_title, re.IGNORECASE) is not None,
+            re.search(r"(證券|securities)[^：:]{0,40}[：:]", lower_title, re.IGNORECASE) is not None
+            and any(_contains_keyword(lower_title, keyword) for keyword in BROKERAGE_NAMES),
+        ]
+    )
+    if not marker_hit:
         return False
 
     if not any(_contains_keyword(lower_text, keyword) for keyword in NON_BROKER_INDUSTRY_COMMENTARY_KEYWORDS):
@@ -2690,7 +2810,21 @@ def _is_broker_commentary_on_non_broker_industry(lower_title: str, lower_text: s
 
     return not any(
         _contains_keyword(lower_text, keyword)
-        for keyword in MARKET_RULE_CORE_TERMS + BROKER_EARNINGS_STRATEGY_EXCEPTION_KEYWORDS
+        for keyword in MARKET_RULE_CORE_TERMS
+        + [
+            "裁罰",
+            "系統出包",
+            "系統當機",
+            "錯帳",
+            "下單",
+            "限制業務",
+            "market-entry regime",
+            "regulatory approval",
+            "tokenized securities",
+            "on-chain settlement",
+            "鏈上交割",
+            "鏈上結算",
+        ]
     )
 
 
@@ -2743,6 +2877,23 @@ def _is_platform_market_recap(lower_title: str, lower_text: str, source: str) ->
             "牌照",
         ]
     )
+
+
+def _is_non_core_crypto_product_news(lower_text: str) -> bool:
+    if not any(_contains_keyword(lower_text, keyword) for keyword in CRYPTO_PRODUCT_NOISE_KEYWORDS):
+        return False
+
+    return not any(_contains_keyword(lower_text, keyword) for keyword in CORE_PRODUCT_STRATEGY_ACTION_KEYWORDS)
+
+
+def _is_low_value_regulator_or_market_item(lower_text: str) -> bool:
+    if not any(_contains_keyword(lower_text, keyword) for keyword in LOW_VALUE_REGULATOR_MARKET_KEYWORDS):
+        return False
+
+    if any(_contains_keyword(lower_text, keyword) for keyword in LOW_VALUE_REGULATOR_EXCEPTION_KEYWORDS):
+        return False
+
+    return True
 
 
 def _product_event_level(title: str, summary: str, source: str) -> int | None:
