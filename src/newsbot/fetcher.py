@@ -13,6 +13,8 @@ import feedparser
 from .models import Article
 from .sources import RSS_SOURCES, NewsSource
 
+ARTICLE_TEXT_CACHE: dict[str, str] = {}
+
 
 HIGH_IMPORTANCE_KEYWORDS = [
     "交易制度",
@@ -1011,6 +1013,30 @@ LOW_VALUE_REGULATOR_EXCEPTION_KEYWORDS = [
     "錯帳",
     "限制業務",
     "market structure",
+]
+
+BORDERLINE_FULL_TEXT_KEYWORDS = [
+    "AI",
+    "ai",
+    "RWA",
+    "tokenized",
+    "tokenization",
+    "代幣化",
+    "鏈上",
+    "on-chain",
+    "金管會",
+    "監管",
+    "regulatory",
+    "approval",
+    "brokerage platform",
+    "brokerage accounts",
+    "券商公會",
+    "金融共好論壇",
+    "論壇",
+    "Devexperts",
+    "TradingView",
+    "PR Newswire",
+    "Yahoo Finance",
 ]
 
 HARD_EXCLUDE_PATTERNS = [
@@ -2142,17 +2168,18 @@ def fetch_articles(lookback_hours: int, sources: list[NewsSource] | None = None)
 
             summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
             clean_summary = _clean_summary(summary)
-            if not _is_relevant(title, clean_summary, source.name, published_at, url):
+            review_summary = _summary_with_optional_article_text(title, clean_summary, source.name, url)
+            if not _is_relevant(title, review_summary, source.name, published_at, url):
                 stats["irrelevant"] += 1
                 continue
 
-            score = _importance_score(title, clean_summary, source.name, published_at)
+            score = _importance_score(title, review_summary, source.name, published_at)
             article = Article(
                 title=title,
                 url=url,
                 source=source.name,
                 published_at=published_at,
-                summary=clean_summary,
+                summary=review_summary,
             )
 
             seen_urls.add(url)
@@ -2247,6 +2274,68 @@ def _entry_datetime(entry: object) -> datetime | None:
 
 def _clean_summary(value: str) -> str:
     return _strip_html(value)[:700]
+
+
+def _summary_with_optional_article_text(title: str, summary: str, source: str, url: str) -> str:
+    if not _needs_full_text_review(title, summary, source):
+        return summary
+
+    article_text = _fetch_article_text(url)
+    if not article_text:
+        return summary
+
+    return f"{summary}\n{article_text}"[:5000]
+
+
+def _needs_full_text_review(title: str, summary: str, source: str) -> bool:
+    text = f"{title}\n{summary}\n{source}".lower()
+    return any(_contains_keyword(text, keyword) for keyword in BORDERLINE_FULL_TEXT_KEYWORDS)
+
+
+def _fetch_article_text(url: str) -> str:
+    if not url:
+        return ""
+    if url in ARTICLE_TEXT_CACHE:
+        return ARTICLE_TEXT_CACHE[url]
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        "Referer": "https://news.google.com/",
+    }
+    try:
+        response = urlopen(Request(url, headers=headers), timeout=8)
+        content_type = response.headers.get("Content-Type", "")
+        if "html" not in content_type.lower() and "text" not in content_type.lower():
+            ARTICLE_TEXT_CACHE[url] = ""
+            return ""
+        raw = response.read(350_000)
+    except Exception:
+        ARTICLE_TEXT_CACHE[url] = ""
+        return ""
+
+    html = raw.decode("utf-8", errors="ignore")
+    text = _html_to_article_text(html)
+    ARTICLE_TEXT_CACHE[url] = text
+    return text
+
+
+def _html_to_article_text(html: str) -> str:
+    html = re.sub(r"(?is)<(script|style|noscript|svg|header|footer|nav|aside)[^>]*>.*?</\1>", " ", html)
+    html = re.sub(r"(?is)<!--.*?-->", " ", html)
+    html = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>|</h[1-6]>", "\n", html)
+    text = _strip_html(html)
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(
+        r"(?i)(cookie|privacy policy|terms of service|subscribe|sign in|login|advertisement|all rights reserved).{0,120}",
+        " ",
+        text,
+    )
+    return text.strip()[:3500]
 
 
 def _clean_title(value: str) -> str:
