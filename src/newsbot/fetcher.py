@@ -194,6 +194,8 @@ BROKERAGE_NAMES = [
     "SoFi",
     "eToro",
     "DEGIRO",
+    "flatexDEGIRO",
+    "flatex",
     "Trading 212",
     "IG Group",
     "XTB",
@@ -687,6 +689,9 @@ BROKER_EARNINGS_NOISE_KEYWORDS = [
     "earnings",
     "quarterly results",
     "quarterly earnings",
+    "record results",
+    "net income",
+    "net profit",
     "profit",
     "profits",
     "revenue",
@@ -708,8 +713,6 @@ BROKER_EARNINGS_NOISE_KEYWORDS = [
 BROKER_EARNINGS_STRATEGY_EXCEPTION_KEYWORDS = [
     "launch",
     "launches",
-    "expand",
-    "expands",
     "partnership",
     "partners",
     "platform",
@@ -734,6 +737,40 @@ BROKER_EARNINGS_STRATEGY_EXCEPTION_KEYWORDS = [
     "清算",
     "代幣化",
     "證券型代幣",
+]
+
+FINANCIAL_PERFORMANCE_KEYWORDS = [
+    "財報",
+    "營收",
+    "獲利",
+    "純益",
+    "淨利",
+    "稅後純益",
+    "稅後淨利",
+    "每股盈餘",
+    "EPS",
+    "eps",
+    "年增",
+    "月增",
+    "季增",
+    "record results",
+    "net income",
+    "net profit",
+    "profit",
+    "profits",
+    "revenue",
+    "earnings",
+    "quarterly results",
+    "quarterly earnings",
+]
+
+FINANCIAL_PERFORMANCE_PATTERNS = [
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in [
+        r"(純益|淨利|營收|獲利).{0,12}(億|萬元|元|年增|月增|季增|%)",
+        r"(net income|net profit|profit|revenue|earnings).{0,40}(percent|%|increase|decrease|growth|decline)",
+        r"(record results|financial results|quarterly results)",
+    ]
 ]
 
 BROKER_COMMENTARY_MARKERS = [
@@ -935,11 +972,39 @@ LOW_VALUE_REGULATOR_MARKET_KEYWORDS = [
     "renminbi business",
     "islamic bond",
     "islamic bonds",
+    "保險監理",
+    "全齡金融",
+    "金融共好論壇",
+    "信任金融",
+    "核心策略",
+    "銀行局長",
+    "三A境界",
+    "AI金融呈現",
+    "AI 金融怎麼管",
+    "四大目標",
+    "防歧視",
+    "消費者失聲",
+    "轉換公司債",
+    "無擔保轉換公司債",
+    "募集期間",
+    "申請展延",
+    "本公司申請展延",
+    "functionality to brokerage platform",
+    "options-on-futures functionality",
+    "Devexperts",
 ]
 
 LOW_VALUE_REGULATOR_EXCEPTION_KEYWORDS = [
     "交易制度",
     "市場制度",
+    "修法",
+    "證交稅",
+    "當沖稅",
+    "稅率減半",
+    "券商公會",
+    "全體證券商",
+    "證券商上半年",
+    "產業升級",
     "系統出包",
     "系統當機",
     "下單",
@@ -2576,6 +2641,11 @@ def _event_key(title: str) -> str | None:
     ):
         return "tw_fsc_h1_penalty_statistics"
 
+    if ("全體證券商" in title or "證券商" in title) and any(
+        keyword in title for keyword in ["上半年", "H1", "稅後純益", "稅後淨利", "純益", "淨利"]
+    ):
+        return "tw_brokerage_industry_h1_profit"
+
     taishin_system_terms = ["台新證", "台新證券", "系統", "app", "下單", "錯帳", "當機", "出包", "災情"]
     taishin_penalty_terms = ["金管會", "裁罰", "重罰", "360萬", "360 萬", "限制", "史上最高", "最重罰"]
     if any(keyword.lower() in lower_title for keyword in taishin_system_terms) and any(
@@ -2634,6 +2704,9 @@ def _is_relevant(
     if any(keyword.lower() in lower_text for keyword in ABSOLUTE_EXCLUDE_KEYWORDS) or any(
         pattern.search(f"{title}\n{summary}") for pattern in ABSOLUTE_EXCLUDE_PATTERNS
     ):
+        return False
+
+    if _is_financial_performance_news(lower_text):
         return False
 
     if _is_broker_earnings_or_stock_news(lower_text):
@@ -2812,6 +2885,12 @@ def _is_individual_corporate_filing(lower_text: str) -> bool:
 
 def _has_corporate_filing_strategy_exception(lower_text: str) -> bool:
     return any(_contains_keyword(lower_text, keyword) for keyword in CORPORATE_FILING_STRATEGY_EXCEPTION_KEYWORDS)
+
+
+def _is_financial_performance_news(lower_text: str) -> bool:
+    return any(_contains_keyword(lower_text, keyword) for keyword in FINANCIAL_PERFORMANCE_KEYWORDS) or any(
+        pattern.search(lower_text) for pattern in FINANCIAL_PERFORMANCE_PATTERNS
+    )
 
 
 def _is_broker_earnings_or_stock_news(lower_text: str) -> bool:
