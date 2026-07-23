@@ -924,6 +924,17 @@ LOW_VALUE_REGULATOR_MARKET_KEYWORDS = [
     "預測市場",
     "prediction market",
     "prediction markets",
+    "黃金巿場",
+    "黃金市場",
+    "伊斯蘭債券",
+    "人民幣業務",
+    "可靠夥伴",
+    "進一步合作",
+    "further cooperation",
+    "gold market",
+    "renminbi business",
+    "islamic bond",
+    "islamic bonds",
 ]
 
 LOW_VALUE_REGULATOR_EXCEPTION_KEYWORDS = [
