@@ -221,6 +221,54 @@ BROKERAGE_NAMES = [
     "群益證券",
 ]
 
+DOMESTIC_BROKERAGE_NAMES = [
+    "元大證券",
+    "富邦證券",
+    "國泰證券",
+    "凱基證券",
+    "永豐金證券",
+    "群益證券",
+    "台新證券",
+    "台新證",
+    "新光證券",
+    "中國信託證券",
+    "中信證券",
+    "玉山證券",
+    "兆豐證券",
+    "統一證券",
+    "第一金證券",
+    "華南永昌證券",
+    "元富證券",
+    "康和證券",
+    "券商公會",
+    "證券商公會",
+    "全體證券商",
+]
+
+DOMESTIC_MARKET_STRUCTURE_EXCEPTION_KEYWORDS = [
+    "交易制度",
+    "市場制度",
+    "修法",
+    "法規",
+    "制度調整",
+    "證交稅",
+    "當沖稅",
+    "稅率減半",
+    "交割",
+    "清算",
+    "撮合",
+    "逐筆交易",
+    "延長交易",
+    "金管會發布",
+    "金管會核准",
+    "證交所宣布",
+    "證交所發布",
+    "櫃買中心發布",
+    "market structure",
+    "market reform",
+    "rule change",
+]
+
 MACRO_CONTEXT_KEYWORDS = [
     "策略",
     "戰略",
@@ -2798,6 +2846,9 @@ def _is_relevant(
     if _is_financial_performance_news(lower_text):
         return False
 
+    if _is_domestic_brokerage_news(lower_title, lower_text):
+        return False
+
     if _is_broker_earnings_or_stock_news(lower_text):
         return False
 
@@ -2980,6 +3031,22 @@ def _is_financial_performance_news(lower_text: str) -> bool:
     return any(_contains_keyword(lower_text, keyword) for keyword in FINANCIAL_PERFORMANCE_KEYWORDS) or any(
         pattern.search(lower_text) for pattern in FINANCIAL_PERFORMANCE_PATTERNS
     )
+
+
+def _is_domestic_brokerage_news(lower_title: str, lower_text: str) -> bool:
+    if not any(_contains_keyword(lower_text, keyword) for keyword in DOMESTIC_BROKERAGE_NAMES):
+        return False
+
+    exception_in_title = any(
+        _contains_keyword(lower_title, keyword) for keyword in DOMESTIC_MARKET_STRUCTURE_EXCEPTION_KEYWORDS
+    )
+    exception_in_text = any(
+        _contains_keyword(lower_text, keyword) for keyword in DOMESTIC_MARKET_STRUCTURE_EXCEPTION_KEYWORDS
+    )
+    if exception_in_title or exception_in_text:
+        return False
+
+    return True
 
 
 def _is_broker_earnings_or_stock_news(lower_text: str) -> bool:
