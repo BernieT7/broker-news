@@ -565,6 +565,21 @@ ABSOLUTE_EXCLUDE_KEYWORDS = [
     "大開鍘",
     "裁罰風向",
     "小案少、大案重",
+    "ratings agency acquisition",
+    "credit rating agency acquisition",
+    "ratings' presence",
+    "ratings presence",
+    "Agusto & Company",
+    "majority stake in Agusto",
+    "分行開業",
+    "新分行開業",
+    "分行增至",
+    "全港分行",
+    "branch opening",
+    "new branch",
+    "branch network",
+    "協辦輔導推薦證券商",
+    "推薦證券商生效",
 ]
 
 ABSOLUTE_EXCLUDE_PATTERNS = [
@@ -582,6 +597,13 @@ ABSOLUTE_EXCLUDE_PATTERNS = [
         r"裁罰.*(銀行業|銀行局).*(大單|大罰單|開鍘|達成率)",
         r"上半年.*裁罰.*(億元|萬元)",
         r"h1.*裁罰.*(億元|萬元)",
+        r"s&p global.*acquire.*agusto",
+        r"credit rating agency.*(acquire|acquisition|majority stake)",
+        r"ratings['’]?\s+presence.*debt markets",
+        r"(分行開業|新分行開業|分行增至|全港分行)",
+        r"(branch opening|new branch|branch network)",
+        r"申請加入.*興櫃股票.*推薦證券商",
+        r"協辦輔導推薦證券商",
     ]
 ]
 
@@ -808,6 +830,9 @@ FINANCIAL_PERFORMANCE_KEYWORDS = [
     "net profit",
     "profit",
     "profits",
+    "annual loss",
+    "annual losses",
+    "smaller annual loss",
     "revenue",
     "earnings",
     "quarterly results",
@@ -818,7 +843,9 @@ FINANCIAL_PERFORMANCE_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
         r"(純益|淨利|營收|獲利).{0,12}(億|萬元|元|年增|月增|季增|%)",
-        r"(net income|net profit|profit|revenue|earnings).{0,40}(percent|%|increase|decrease|growth|decline)",
+        r"(net income|net profit|profit|revenue|earnings|loss|losses).{0,40}(percent|%|increase|decrease|growth|decline|smaller|wider)",
+        r"reports?.{0,40}(annual )?(loss|losses)",
+        r"(annual )?(loss|losses).{0,40}(percent|%|smaller|wider|narrowed|expanded)",
         r"(record results|financial results|quarterly results)",
     ]
 ]
@@ -2782,6 +2809,11 @@ def _event_key(title: str) -> str | None:
         keyword in title for keyword in ["上半年", "H1", "稅後純益", "稅後淨利", "純益", "淨利"]
     ):
         return "tw_brokerage_industry_h1_profit"
+
+    if ("東方證券" in title and "上海證券" in title) and any(
+        keyword in title for keyword in ["收購", "併購", "合併", "整合"]
+    ):
+        return "cn_orient_securities_shanghai_securities_acquisition"
 
     taishin_system_terms = ["台新證", "台新證券", "系統", "app", "下單", "錯帳", "當機", "出包", "災情"]
     taishin_penalty_terms = ["金管會", "裁罰", "重罰", "360萬", "360 萬", "限制", "史上最高", "最重罰"]
