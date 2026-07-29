@@ -120,3 +120,8 @@ https://www.cna.com.tw/news/aipl/202607240199.aspx
 https://crc.sfaa.gov.tw/Uploadfile/Statiscs/80_20250630153055_8388733.pdf
 https://crc.sfaa.gov.tw/Statistics/Detail/171
 https://news.pchome.com.tw/finance/cna/20260721/index-17846417094830018003.html
+摘要：
+這篇新聞主要在講 英國 FCA 監管券商 Global Markets Group（GMG）在 2026 財年營收大幅成長、虧損明顯縮小，同時開始發展機構級 prime brokerage 業務。GMG 截至 2026 年 3 月底的年度營收達 164 萬英鎊，高於前一年的 10.7 萬英鎊；營業虧損從 73.0 萬英鎊縮小到 20.2 萬英鎊，淨虧損也從 71.8 萬英鎊降到 16.1 萬英鎊。
+比較重要的是，GMG 不再只是 retail/professional execution-only broker。FCA 在 2025 年 7 月取消其 matched-principal 限制後，GMG 可以內部化一部分客戶訂單，但公司表示仍大多數會避險，維持較低市場曝險。同時，它推出 GMG Prime，鎖定券商、家族辦公室與避險基金經理，提供外匯、金屬、商品、指數與股票等多資產流動性。
+在基礎設施方面，GMG 導入 MetaQuotes 的 Ultency Matching Engine，讓其他券商可以透過 MT5 連接 GMG 流動性，並支援報價聚合、訂單撮合、即時風控與 FIX 連線。另外，GMG 也和 Hidden Road 簽訂 prime-of-prime 合作，讓它能透過單一信用對手方連接多個流動性提供者、交易所與 ECN，涵蓋外匯、金屬、交易所衍生品、固定收益與數位資產。
+整體來看，這篇新聞的重點是：GMG 正從一般零售外匯/CFD 券商，轉向機構級流動性與 prime brokerage 服務商；它的成長關鍵不只在客戶交易量增加，而是在能否透過 MT5、FIX、prime-of-prime 與多資產流動性，建立更高階的券商基礎設施業務。
