@@ -828,6 +828,199 @@ BROKER_EARNINGS_STRATEGY_EXCEPTION_KEYWORDS = [
     "證券型代幣",
 ]
 
+# Single-company listing reviews are issuer-specific events, not market-rule changes.
+INDIVIDUAL_LISTING_CASE_KEYWORDS = [
+    "上櫃案",
+    "上市案",
+    "上市申請案",
+    "上櫃申請案",
+    "申請上市",
+    "申請上櫃",
+    "審議通過",
+    "審查通過",
+    "上市審議委員會",
+    "上櫃審議委員會",
+    "listing application",
+    "listing review",
+    "listing approval",
+]
+
+INDIVIDUAL_LISTING_DETAIL_KEYWORDS = [
+    "公司名稱",
+    "股票代號",
+    "實收資本額",
+    "資本額",
+    "推薦證券商",
+    "主辦承銷商",
+    "協辦輔導推薦證券商",
+    "董事長",
+    "每股盈餘",
+    "主要產品",
+]
+
+LISTING_SYSTEM_REFORM_KEYWORDS = [
+    "上市制度",
+    "上櫃制度",
+    "上市規則",
+    "上櫃規則",
+    "審查制度",
+    "審議制度",
+    "承銷制度",
+    "配售制度",
+    "上市門檻",
+    "上櫃門檻",
+    "制度改革",
+    "規則修正",
+    "全面調整",
+    "多家公司",
+    "全體公司",
+    "listing reform",
+    "listing rules",
+    "listing standards",
+    "market-wide",
+]
+
+# Reiterations and reminders are operational notices unless they announce a concrete change.
+EXISTING_RULE_REMINDER_KEYWORDS = [
+    "重申",
+    "再次重申",
+    "再度重申",
+    "提醒",
+    "再次提醒",
+    "呼籲",
+    "澄清",
+    "說明既有",
+    "維持不變",
+    "仍採",
+    "現行規定",
+    "應審慎評估",
+    "reiterates",
+    "reiterated",
+    "reminds",
+    "reminded",
+    "clarifies",
+    "clarified",
+    "unchanged",
+    "existing rule",
+    "existing rules",
+]
+
+CONCRETE_RULE_CHANGE_KEYWORDS = [
+    "新制",
+    "新機制",
+    "修正",
+    "調整",
+    "放寬",
+    "縮短",
+    "延長",
+    "新增",
+    "取消",
+    "改為",
+    "改採",
+    "擴大適用",
+    "正式上路",
+    "生效",
+    "修法",
+    "通過新規",
+    "rule change",
+    "new rule",
+    "new rules",
+    "amends",
+    "amended",
+    "changes",
+    "revises",
+    "revised",
+    "expands eligibility",
+    "takes effect",
+]
+
+# Generic words such as regulation are not enough; the article must concern finance/securities.
+GENERIC_REGULATION_KEYWORDS = [
+    "法規",
+    "法規鬆綁",
+    "監理",
+    "監管",
+    "修法",
+    "regulation",
+    "regulatory",
+    "deregulation",
+    "rule change",
+]
+
+FINANCIAL_DOMAIN_KEYWORDS = [
+    "金融",
+    "證券",
+    "券商",
+    "證券商",
+    "資本市場",
+    "投資人保護",
+    "投資者保護",
+    "交易制度",
+    "證券交易",
+    "交易所",
+    "證交所",
+    "櫃買",
+    "清算",
+    "交割",
+    "託管",
+    "基金",
+    "金融商品",
+    "數位證券",
+    "代幣化證券",
+    "證券型代幣",
+    "broker",
+    "brokerage",
+    "broker-dealer",
+    "securities",
+    "capital market",
+    "investor protection",
+    "stock exchange",
+    "trading venue",
+    "clearing",
+    "settlement",
+    "custody",
+    "tokenized securities",
+    "digital securities",
+]
+
+# Research reports about the listed shares of a brokerage are not brokerage-strategy news.
+BROKER_STOCK_RESEARCH_KEYWORDS = [
+    "consensus rating",
+    "moderate buy",
+    "strong buy",
+    "average rating",
+    "buy rating",
+    "hold rating",
+    "sell rating",
+    "analyst rating",
+    "analyst ratings",
+    "price target",
+    "target price",
+    "coverage initiated",
+    "coverage initiation",
+    "rating of",
+    "rated by",
+    "from brokerages",
+    "analysts rate",
+    "analysts expect",
+    "券商評等",
+    "分析師評等",
+    "一致評級",
+    "目標價",
+]
+
+BROKER_STOCK_RESEARCH_PATTERNS = [
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in [
+        r"receives? consensus rating",
+        r"given (?:an? )?(?:average|consensus) rating",
+        r"rating of [\"']?(?:strong buy|moderate buy|buy|hold|sell)",
+        r"analysts?.{0,30}(?:rate|rating|price target|target price)",
+        r"(?:nyse|nasdaq)[:：][a-z.]+.{0,80}(?:rating|price target|analyst)",
+        r"(?:券商|分析師).{0,20}(?:評等|評級|目標價|看好|喊買)",
+    ]
+]
+
 FINANCIAL_PERFORMANCE_KEYWORDS = [
     "財報",
     "營收",
@@ -2849,6 +3042,11 @@ def _event_key(title: str) -> str | None:
     ):
         return "tw_fsc_financial_ai_cybersecurity"
 
+    if "證交所" in title and "處置" in title and any(
+        keyword in title for keyword in ["機制", "撮合", "天數", "減半", "2分鐘", "兩分鐘", "上路", "調整", "放寬"]
+    ):
+        return "tw_twse_disposition_mechanism_reform"
+
     if "零股" in title and any(keyword in title for keyword in ["撮合", "9點", "提前", "提早", "開盤"]):
         return "tw_fractional_lot_reform"
 
@@ -2890,6 +3088,18 @@ def _is_relevant(
     if any(keyword.lower() in lower_text for keyword in ABSOLUTE_EXCLUDE_KEYWORDS) or any(
         pattern.search(f"{title}\n{summary}") for pattern in ABSOLUTE_EXCLUDE_PATTERNS
     ):
+        return False
+
+    if _is_individual_listing_case(lower_title, lower_text):
+        return False
+
+    if _is_existing_rule_reminder(lower_title, lower_text):
+        return False
+
+    if _is_broker_stock_research(lower_title, lower_text):
+        return False
+
+    if _is_non_financial_regulation_article(lower_title, lower_text, source):
         return False
 
     if _is_financial_performance_news(lower_text):
@@ -3074,6 +3284,69 @@ def _is_individual_corporate_filing(lower_text: str) -> bool:
 
 def _has_corporate_filing_strategy_exception(lower_text: str) -> bool:
     return any(_contains_keyword(lower_text, keyword) for keyword in CORPORATE_FILING_STRATEGY_EXCEPTION_KEYWORDS)
+
+
+def _is_individual_listing_case(lower_title: str, lower_text: str) -> bool:
+    listing_case_hit = any(_contains_keyword(lower_title, keyword) for keyword in INDIVIDUAL_LISTING_CASE_KEYWORDS)
+    if not listing_case_hit:
+        return False
+
+    if any(_contains_keyword(lower_text, keyword) for keyword in LISTING_SYSTEM_REFORM_KEYWORDS):
+        return False
+
+    detail_hits = sum(
+        1 for keyword in INDIVIDUAL_LISTING_DETAIL_KEYWORDS if _contains_keyword(lower_text, keyword)
+    )
+    explicit_case_pattern = any(
+        re.search(pattern, lower_title, re.IGNORECASE)
+        for pattern in [
+            r"審議通過.{0,40}(上市案|上櫃案)",
+            r"(上市案|上櫃案).{0,20}(通過|核准)",
+            r"(?:twse|tpex).{0,50}listing (?:application|approval)",
+        ]
+    )
+    return explicit_case_pattern or detail_hits >= 1
+
+
+def _is_existing_rule_reminder(lower_title: str, lower_text: str) -> bool:
+    reminder_hit = any(_contains_keyword(lower_title, keyword) for keyword in EXISTING_RULE_REMINDER_KEYWORDS)
+    if not reminder_hit:
+        return False
+
+    concrete_change_hit = any(
+        _contains_keyword(lower_text, keyword) for keyword in CONCRETE_RULE_CHANGE_KEYWORDS
+    )
+    return not concrete_change_hit
+
+
+def _is_broker_stock_research(lower_title: str, lower_text: str) -> bool:
+    broker_hit = any(_contains_keyword(lower_text, keyword) for keyword in BROKERAGE_NAMES)
+    if not broker_hit:
+        return False
+
+    keyword_hit = any(_contains_keyword(lower_title, keyword) for keyword in BROKER_STOCK_RESEARCH_KEYWORDS)
+    pattern_hit = any(pattern.search(lower_title) for pattern in BROKER_STOCK_RESEARCH_PATTERNS)
+    return keyword_hit or pattern_hit
+
+
+def _is_non_financial_regulation_article(lower_title: str, lower_text: str, source: str) -> bool:
+    regulation_hit = any(_contains_keyword(lower_title, keyword) for keyword in GENERIC_REGULATION_KEYWORDS)
+    if not regulation_hit:
+        return False
+
+    financial_title_hit = any(_contains_keyword(lower_title, keyword) for keyword in FINANCIAL_DOMAIN_KEYWORDS)
+    if financial_title_hit:
+        return False
+
+    lower_source = source.lower()
+    official_financial_source = any(keyword.lower() in lower_source for keyword in OFFICIAL_SOURCES)
+    if official_financial_source and any(
+        _contains_keyword(lower_text, keyword) for keyword in FINANCIAL_DOMAIN_KEYWORDS
+    ):
+        return False
+
+    # A generic industry article mentioning regulation only in passing is outside scope.
+    return True
 
 
 def _is_financial_performance_news(lower_text: str) -> bool:
@@ -3533,7 +3806,17 @@ def _has_required_focus(lower_title: str, lower_text: str, source: str) -> bool:
     if any(_contains_keyword(lower_title, keyword) for keyword in BROKERAGE_CORE_TERMS):
         return True
 
-    if any(_contains_keyword(lower_title, keyword) for keyword in MARKET_RULE_CORE_TERMS):
+    specific_market_rule_terms = [
+        keyword
+        for keyword in MARKET_RULE_CORE_TERMS
+        if keyword not in {"監理", "法規", "裁罰", "regulation", "regulatory"}
+    ]
+    if any(_contains_keyword(lower_title, keyword) for keyword in specific_market_rule_terms):
+        return True
+
+    generic_rule_hit = any(_contains_keyword(lower_title, keyword) for keyword in GENERIC_REGULATION_KEYWORDS)
+    financial_domain_hit = any(_contains_keyword(lower_title, keyword) for keyword in FINANCIAL_DOMAIN_KEYWORDS)
+    if generic_rule_hit and financial_domain_hit:
         return True
 
     lower_source = source.lower()
@@ -3632,7 +3915,7 @@ def _importance_score(
 
 
 def _count_hits(lower_text: str, keywords: list[str]) -> int:
-    return sum(1 for keyword in keywords if keyword.lower() in lower_text)
+    return sum(1 for keyword in keywords if _contains_keyword(lower_text, keyword))
 
 
 def _contains_keyword(lower_text: str, keyword: str) -> bool:
@@ -3648,10 +3931,9 @@ def _weighted_keyword_hits(title: str, summary: str, keywords: list[str]) -> flo
     summary_text = summary.lower()
     score = 0.0
     for keyword in keywords:
-        lower_keyword = keyword.lower()
-        if lower_keyword in title_text:
+        if _contains_keyword(title_text, keyword):
             score += 1.0
-        elif lower_keyword in summary_text:
+        elif _contains_keyword(summary_text, keyword):
             score += 0.4
     return score
 
@@ -3662,11 +3944,11 @@ def _capped_topic_score(title: str, summary: str, keywords: list[str], cap: int)
 
 def _action_score(title: str, summary: str) -> int:
     text = f"{title}\n{summary}".lower()
-    if any(keyword.lower() in text for keyword in HIGH_IMPACT_ACTIONS):
+    if any(_contains_keyword(text, keyword) for keyword in HIGH_IMPACT_ACTIONS):
         return 8
-    if any(keyword.lower() in text for keyword in MEDIUM_IMPACT_ACTIONS):
+    if any(_contains_keyword(text, keyword) for keyword in MEDIUM_IMPACT_ACTIONS):
         return 5
-    if any(keyword.lower() in text for keyword in LOW_IMPACT_ACTIONS):
+    if any(_contains_keyword(text, keyword) for keyword in LOW_IMPACT_ACTIONS):
         return 1
     return 0
 
