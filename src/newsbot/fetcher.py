@@ -1021,6 +1021,48 @@ BROKER_STOCK_RESEARCH_PATTERNS = [
     ]
 ]
 
+# Headlines framed as explainers or trend roundups are useful research material,
+# but they are not a new event unless the headline also names a concrete action.
+TREND_ANALYSIS_TITLE_PATTERNS = [
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in [
+        r"\bthe race to\b",
+        r"\brace to\b.{0,80}\b(?:tokenize|tokenization|rebuild|transform)",
+        r"\bhow\b.{0,100}\b(?:are|is)\b.{0,40}\b(?:rebuilding|reshaping|transforming)",
+        r"\b(?:explainer|outlook|deep dive|what to know)\b",
+        r"(?:競賽|競逐).{0,30}(?:日趨|升溫|白熱化)",
+        r"(?:趨勢|全解析|懶人包|一次看懂|深度解析)",
+    ]
+]
+
+CONCRETE_EVENT_TITLE_KEYWORDS = [
+    "宣布",
+    "推出",
+    "上線",
+    "簽署",
+    "合作",
+    "核准",
+    "通過",
+    "取得執照",
+    "正式開放",
+    "正式啟動",
+    "裁員",
+    "launch",
+    "launches",
+    "launched",
+    "announces",
+    "announced",
+    "signs",
+    "signed",
+    "partners",
+    "partnered",
+    "approves",
+    "approved",
+    "goes live",
+    "cuts",
+    "lays off",
+]
+
 FINANCIAL_PERFORMANCE_KEYWORDS = [
     "財報",
     "營收",
@@ -2852,6 +2894,7 @@ def _fingerprint_topics(lower_text: str) -> set[str]:
         "virtual_asset": ["virtual asset", "虛擬資產", "digital asset", "on-chain finance", "blockchain finance"],
         "market_structure": ["交易制度", "market structure", "market design", "撮合", "逐筆交易"],
         "settlement": ["交割", "清算", "settlement", "clearing", "central counterparty"],
+        "corporate_actions": ["公司行動", "corporate action", "corporate actions"],
         "stock_gift_card": ["股票禮品卡", "禮品卡", "stock gift card", "gift card"],
         "financial_cyber_ai": ["AI攻擊", "ai攻擊", "金融資安", "資安", "cybersecurity", "cyber attack", "AI attack"],
         "cross_border": ["複委託", "海外交易", "海外股票", "cross-border", "global trading"],
@@ -2934,6 +2977,17 @@ def _fingerprint_regions(lower_text: str, source: str) -> set[str]:
 
 def _fingerprint_actors(lower_text: str) -> set[str]:
     actors: set[str] = set()
+    tdcc_aliases = [
+        "tdcc",
+        "臺灣集中保管結算所",
+        "台灣集中保管結算所",
+        "集保結算所",
+        "集保結算機構",
+        "台美集保",
+    ]
+    if any(_contains_keyword(lower_text, alias) for alias in tdcc_aliases):
+        actors.add("tdcc")
+
     actor_keywords = (
         BROKERAGE_NAMES
         + OFFICIAL_SOURCES
@@ -3099,6 +3153,9 @@ def _is_relevant(
     if _is_broker_stock_research(lower_title, lower_text):
         return False
 
+    if _is_trend_analysis_without_new_event(lower_title):
+        return False
+
     if _is_non_financial_regulation_article(lower_title, lower_text, source):
         return False
 
@@ -3251,6 +3308,9 @@ def _is_sfc_single_entity_alert_title(lower_title: str, source: str) -> bool:
         return False
 
     entity_terms = [
+        "inc.",
+        " inc",
+        "incorporated",
         "limited",
         "ltd",
         "company",
@@ -3267,6 +3327,12 @@ def _is_sfc_single_entity_alert_title(lower_title: str, source: str) -> bool:
         ".com",
     ]
     return any(term in entity_part for term in entity_terms)
+
+
+def _is_trend_analysis_without_new_event(lower_title: str) -> bool:
+    if not any(pattern.search(lower_title) for pattern in TREND_ANALYSIS_TITLE_PATTERNS):
+        return False
+    return not any(_contains_keyword(lower_title, keyword) for keyword in CONCRETE_EVENT_TITLE_KEYWORDS)
 
 
 def _is_individual_corporate_filing(lower_text: str) -> bool:
