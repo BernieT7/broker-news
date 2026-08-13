@@ -98,6 +98,85 @@ RSS_SOURCES: list[NewsSource] = [
         lang="en-US",
         region="GB",
     ),
+    google_news_source(
+        "券商金融科技專業媒體",
+        "site:financemagnates.com OR site:fintechfutures.com OR site:globalfintechseries.com OR site:thefintechtimes.com "
+        "brokerage OR broker OR trading platform OR clearing OR settlement",
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "市場基礎設施專業媒體",
+        "site:tradersmagazine.com OR site:marketsmedia.com OR site:waterstechnology.com "
+        "broker OR exchange OR clearing OR settlement OR market structure OR order routing",
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "數位證券專業媒體",
+        "site:ledgerinsights.com OR site:coindesk.com OR site:theblock.co OR site:blockworks.co OR site:dlnews.com "
+        "tokenized securities OR tokenized stocks OR on-chain settlement OR broker-dealer OR custody",
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "企業新聞稿",
+        "site:businesswire.com OR site:prnewswire.com OR site:globenewswire.com OR site:stocktitan.net "
+        "brokerage OR broker-dealer OR exchange OR clearing OR settlement OR trading platform",
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "網路券商官方新聞",
+        "site:robinhood.com/newsroom OR site:interactivebrokers.com OR site:sofi.com/press OR site:webull.com/news "
+        "OR site:etoro.com/news-and-analysis OR site:traderepublic.com OR site:wealthsimple.com OR site:alpaca.markets/blog "
+        "launch OR partnership OR expansion OR clearing OR settlement OR custody OR trading",
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "亞太網路券商官方新聞",
+        "site:futuholdings.com OR site:moomoo.com OR site:sbisec.co.jp OR site:rakuten-sec.co.jp OR site:monexgroup.jp "
+        "launch OR partnership OR market OR trading OR settlement",
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "市場基礎設施官方新聞",
+        "site:nyse.com OR site:nasdaq.com OR site:memx.com OR site:cboe.com OR site:cmegroup.com OR site:lseg.com "
+        "OR site:dtcc.com OR site:euroclear.com OR site:clearstream.com OR site:hkexgroup.com OR site:sgx.com "
+        "OR site:jpx.co.jp OR site:global.krx.co.kr clearing OR settlement OR market structure OR trading hours OR tokenized securities",
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "券商產品與基礎設施搜尋",
+        '"online broker launch" OR "retail brokerage platform" OR "brokerage infrastructure" OR '
+        '"brokerage-as-a-service" OR "Alpaca brokerage infrastructure" OR "broker API trading"',
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "券商AI與交易技術搜尋",
+        '"AI trading broker" OR "Model Context Protocol brokerage" OR "order routing broker" OR '
+        '"extended-hours trading broker" OR "24-hour trading equities broker"',
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "證券代幣化與事件合約搜尋",
+        '"securities settlement tokenized" OR "tokenized securities settlement" OR '
+        '"on-chain settlement securities" OR "exchange prediction contracts" OR "event contracts broker"',
+        lang="en-US",
+        region="US",
+    ),
+    google_news_source(
+        "券商收益模式搜尋",
+        '"broker cash sweep" OR "securities lending broker" OR "margin lending broker" OR '
+        '"Interactive Brokers exchange" OR "Robinhood trading"',
+        lang="en-US",
+        region="US",
+    ),
     NewsSource("SEC Press Releases", "https://www.sec.gov/news/pressreleases.rss"),
     NewsSource("FINRA News", "https://www.finra.org/rss/news-releases.xml"),
 ]

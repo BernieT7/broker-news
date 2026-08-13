@@ -304,6 +304,109 @@ CAPITAL_MARKET_ASSET_KEYWORDS = [
     "clearing", "settlement",
 ]
 
+FOREIGN_ONLINE_BROKER_NAMES = [
+    "Robinhood", "Interactive Brokers", "IBKR", "SoFi", "SoFi Invest",
+    "Webull", "Futu", "moomoo", "eToro", "Trade Republic",
+    "Scalable Capital", "Trading 212", "DEGIRO", "flatexDEGIRO",
+    "Wealthsimple", "Questrade", "Zerodha", "Groww", "Upstox",
+    "Angel One", "SBI Securities", "Rakuten Securities", "Monex",
+    "Tiger Brokers", "Saxo Bank", "Alpaca",
+]
+
+MARKET_INFRASTRUCTURE_ACTORS = [
+    "NYSE", "Nasdaq", "MEMX", "Cboe", "CME", "LSE",
+    "London Stock Exchange", "ICE", "DTCC", "Euroclear", "Clearstream",
+    "HKEX", "SGX", "JPX", "KRX", "central counterparty",
+    "clearing house", "securities exchange", "regulated exchange",
+]
+
+CONCRETE_STRATEGY_ACTION_KEYWORDS = [
+    "launch", "launches", "launched", "roll out", "rolls out", "expand",
+    "expands", "expanded", "partner", "partners", "partnership", "acquire",
+    "acquires", "acquisition", "approval", "approved", "regulatory approval",
+    "license", "licensed", "pilot", "test", "testing", "goes live",
+    "officially launches", "market entry", "new market", "new product",
+    "new feature", "clearing", "settlement", "custody", "API", "AI", "MCP",
+    "order routing", "推出", "上線", "擴張", "合作", "收購", "核准",
+    "取得執照", "試點", "測試", "進入市場", "新功能", "清算", "交割",
+    "託管", "下單", "路由", "change", "changes", "changed", "改變", "調整",
+]
+
+WEALTH_MANAGEMENT_EXCLUDE_KEYWORDS = [
+    "wealth management", "wealth platform", "private banking",
+    "financial planning", "investment advisory", "portfolio advisory",
+    "robo-advisor", "automated wealth", "retirement account", "pension",
+    "family office", "high net worth", "HNW", "private markets fund",
+    "private market access", "alternative assets", "venture capital access",
+    "BDC", "business development company", "listed venture fund",
+    "interval fund", "closed-end fund", "財富管理", "高資產", "家族辦公室",
+    "理財規劃", "投資顧問", "智能投顧", "機器人理財", "退休帳戶",
+    "私募市場基金", "另類資產", "創投基金",
+]
+
+BROKER_CORE_BUSINESS_KEEP_KEYWORDS = [
+    "cash sweep", "sweep cash", "idle cash", "free credit balance",
+    "net interest income", "margin lending", "securities lending",
+    "stock lending", "brokerage account", "custody", "clearing", "settlement",
+    "order routing", "DMA", "FIX", "API trading", "extended-hours trading",
+    "24-hour trading", "global trading", "cross-border trading", "閒置現金",
+    "融資", "借券", "證券借貸", "券商帳戶", "託管", "清算", "交割",
+    "下單路由", "複委託", "延長交易",
+]
+
+CAPITAL_MARKET_TOKENIZATION_KEYWORDS = [
+    "tokenized securities", "tokenized stocks", "tokenized equities",
+    "tokenized bonds", "digital securities", "securities token",
+    "on-chain settlement", "atomic settlement", "broker-dealer",
+    "regulated exchange", "securities exchange", "clearing", "settlement",
+    "custody", "代幣化證券", "代幣化股票", "代幣化債券", "數位證券",
+    "證券型代幣", "鏈上結算", "原子交割",
+]
+
+PREDICTION_MARKET_KEYWORDS = [
+    "prediction market", "prediction markets", "event contract",
+    "event contracts", "prediction contract", "prediction contracts",
+    "exchange prediction contract", "exchange prediction contracts",
+    "yes/no contract", "binary outcome", "Kalshi", "Polymarket", "MEMX",
+]
+
+PREDICTION_MARKET_NOISE_KEYWORDS = [
+    "odds movement", "odds shift", "betting odds", "political betting",
+    "sports betting", "entertainment odds", "賠率", "政治賭盤", "體育賭盤",
+    "娛樂事件",
+]
+
+CFD_FX_KEYWORDS = [
+    "CFD", "contract for difference", "forex broker", "FX broker",
+    "外匯券商", "差價合約",
+]
+
+CFD_PROMOTION_KEYWORDS = [
+    "zero fee", "zero-fee", "zero commission", "commission-free",
+    "zero swap", "swap-free", "bonus", "cashback", "campaign", "promotion",
+    "broker review", "平台評測", "開戶優惠", "贈金",
+]
+
+CFD_STRATEGY_KEEP_KEYWORDS = [
+    "B2B infrastructure", "prime brokerage", "liquidity aggregation",
+    "clearing", "white-label brokerage", "brokerage infrastructure",
+    "regulated expansion", "acquisition", "major partnership", "FIX",
+    "DMA", "broker infrastructure provider", "清算", "流動性聚合",
+    "券商基礎設施", "重大合作", "收購",
+]
+
+STOCK_EARNINGS_VALUATION_KEYWORDS = [
+    "earnings", "EPS", "revenue", "net income", "share price", "stock price",
+    "price target", "analyst rating", "valuation", "worth buying",
+    "財報", "營收", "每股盈餘", "股價", "目標價", "分析師評等", "估值",
+    "值得買", "本益比",
+]
+
+PROMOTION_CONTENT_KEYWORDS = PURE_MARKETING_KEYWORDS + [
+    "zero-fee promotion", "zero commission promotion", "bonus campaign",
+    "sponsored review", "開戶優惠", "贈金",
+]
+
 DOMESTIC_BROKERAGE_NAMES = [
     "元大證券",
     "富邦證券",
@@ -3288,6 +3391,179 @@ def _event_key(title: str) -> str | None:
     return None
 
 
+def _is_absolute_noise(lower_title: str, lower_text: str, lower_url: str, source: str) -> bool:
+    if _is_excluded_source(source):
+        return True
+    if any(keyword.lower() in lower_text for keyword in ABSOLUTE_EXCLUDE_KEYWORDS):
+        return True
+    if any(pattern.search(lower_text) for pattern in ABSOLUTE_EXCLUDE_PATTERNS):
+        return True
+    return any(
+        [
+            _is_individual_listing_case(lower_title, lower_text),
+            _is_existing_rule_reminder(lower_title, lower_text),
+            _is_individual_investor_alert(lower_title, lower_text, lower_url, source),
+            _is_individual_corporate_filing(lower_text),
+            _is_individual_trading_status_announcement(lower_text),
+            _is_non_financial_regulation_article(lower_title, lower_text, source),
+            _is_low_value_regulator_or_market_item(lower_text),
+        ]
+    )
+
+
+def _is_wealth_management_main_topic(lower_text: str) -> bool:
+    wealth_hits = _count_contains(lower_text, WEALTH_MANAGEMENT_EXCLUDE_KEYWORDS)
+    if not wealth_hits:
+        return False
+    core_hits = _count_contains(lower_text, BROKER_CORE_BUSINESS_KEEP_KEYWORDS)
+    if core_hits and core_hits >= wealth_hits:
+        return False
+    return True
+
+
+def _is_stock_or_earnings_or_valuation_content(lower_title: str, lower_text: str) -> bool:
+    if _is_broker_stock_research(lower_title, lower_text):
+        return True
+    if _is_financial_performance_news(lower_text) or _is_broker_earnings_or_stock_news(lower_text):
+        return True
+    return _count_contains(lower_text, STOCK_EARNINGS_VALUATION_KEYWORDS) >= 2
+
+
+def _is_education_or_marketing_content(lower_title: str, lower_text: str) -> bool:
+    if _is_education_or_profile_content(lower_text) or _is_trend_analysis_without_new_event(lower_title):
+        return True
+    if _count_contains(lower_text, PROMOTION_CONTENT_KEYWORDS):
+        return not any(
+            _contains_keyword(lower_text, keyword)
+            for keyword in ["regulatory approval", "market entry", "acquisition", "clearing", "settlement"]
+        )
+    return False
+
+
+def _has_capital_market_tokenization_link(lower_text: str) -> bool:
+    direct_link = _count_contains(lower_text, CAPITAL_MARKET_TOKENIZATION_KEYWORDS) > 0
+    actor_link = any(
+        _contains_keyword(lower_text, actor)
+        for actor in FOREIGN_ONLINE_BROKER_NAMES + MARKET_INFRASTRUCTURE_ACTORS + ["Securitize"]
+    )
+    asset_and_tokenization = any(
+        _contains_keyword(lower_text, token_word)
+        for token_word in ["tokenization", "tokenized", "RWA", "代幣化"]
+    ) and any(
+        _contains_keyword(lower_text, asset)
+        for asset in ["stocks", "equities", "bonds", "funds", "ETF", "股票", "債券", "基金", "證券"]
+    )
+    return direct_link or (actor_link and asset_and_tokenization)
+
+
+def _is_crypto_noise_without_capital_market_link(lower_text: str) -> bool:
+    crypto_hit = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "crypto", "cryptocurrency", "RWA", "tokenization", "tokenized", "DeFi",
+            "DEX", "TVL", "meme coin", "mainnet", "stablecoin", "加密", "虛擬資產",
+            "代幣化", "主網", "穩定幣",
+        ]
+    )
+    if not crypto_hit:
+        return False
+    foreign_broker_strategy = any(
+        _contains_keyword(lower_text, name) for name in FOREIGN_ONLINE_BROKER_NAMES
+    ) and _count_contains(lower_text, CONCRETE_STRATEGY_ACTION_KEYWORDS) and any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["regulated market", "brokerage account", "multi-asset trading platform", "market entry"]
+    )
+    if foreign_broker_strategy:
+        return False
+    return not _has_capital_market_tokenization_link(lower_text)
+
+
+def _has_regulated_prediction_market_context(lower_text: str) -> bool:
+    if not _count_contains(lower_text, PREDICTION_MARKET_KEYWORDS):
+        return False
+    return any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "SEC", "CFTC", "regulated", "exchange", "clearing", "broker", "IBKR",
+            "Interactive Brokers", "central clearing", "securities exchange", "交易所",
+            "清算", "券商", "受監管",
+        ]
+    )
+
+
+def _is_prediction_market_noise(lower_text: str) -> bool:
+    if not _count_contains(lower_text, PREDICTION_MARKET_KEYWORDS):
+        return False
+    if _count_contains(lower_text, PREDICTION_MARKET_NOISE_KEYWORDS):
+        return True
+    return not _has_regulated_prediction_market_context(lower_text)
+
+
+def _is_cfd_or_fx_promotion_without_strategy(lower_text: str) -> bool:
+    if not _count_contains(lower_text, CFD_FX_KEYWORDS):
+        return False
+    strategy_hits = _count_contains(lower_text, CFD_STRATEGY_KEEP_KEYWORDS)
+    if _count_contains(lower_text, CFD_PROMOTION_KEYWORDS):
+        return strategy_hits == 0
+    return strategy_hits == 0
+
+
+def _meeting_theme(title: str, summary: str, source: str) -> str | None:
+    lower_text = f"{title}\n{summary}".lower()
+    online_broker = any(_contains_keyword(lower_text, actor) for actor in FOREIGN_ONLINE_BROKER_NAMES)
+    foreign_broker = online_broker or any(
+        _contains_keyword(lower_text, actor) for actor in BROKERAGE_NAMES
+    )
+    infrastructure_actor = any(
+        _contains_keyword(lower_text, actor) for actor in MARKET_INFRASTRUCTURE_ACTORS
+    )
+    concrete_action = _count_contains(lower_text, CONCRETE_STRATEGY_ACTION_KEYWORDS) > 0
+
+    foreign_rule_terms = MEETING_RULE_KEYWORDS + [
+        "T+0", "settlement cycle", "IPO rules", "listing rules", "underwriting rules",
+        "allocation rules", "broker-dealer rule", "best execution", "short selling",
+        "securities lending rule", "custody rule", "market design",
+    ]
+    if (foreign_broker or infrastructure_actor) and _count_contains(lower_text, foreign_rule_terms):
+        return "foreign_broker_new_rule"
+
+    innovation_terms = MEETING_FINANCIAL_INNOVATION_KEYWORDS + CAPITAL_MARKET_TOKENIZATION_KEYWORDS + [
+        "atomic settlement", "stablecoin settlement", "exchange prediction contract",
+        "event contract", "AI trading agent", "AI investing agent", "Model Context Protocol",
+        "brokerage API", "smart order routing", "fractional shares", "24/7 trading infrastructure",
+        "tokenized securities custody", "FIX", "DMA",
+    ]
+    innovation_hit = _count_contains(lower_text, innovation_terms) > 0
+    if innovation_hit and (
+        _has_capital_market_tokenization_link(lower_text)
+        or _has_regulated_prediction_market_context(lower_text)
+        or foreign_broker
+        or infrastructure_actor
+    ):
+        return "broker_related_financial_innovation"
+
+    strategy_terms = BROKER_BUSINESS_MODEL_KEYWORDS + BROKER_CORE_BUSINESS_KEEP_KEYWORDS + [
+        "new market", "market entry", "new product", "new feature", "multi-asset trading platform",
+        "broker revenue model", "regulatory approval", "license", "global trading",
+    ]
+    if foreign_broker and concrete_action and _count_contains(lower_text, strategy_terms):
+        return "foreign_broker_strategy_response"
+
+    if online_broker and concrete_action:
+        return "online_broker_focus"
+
+    if concrete_action and _count_contains(lower_text, CFD_STRATEGY_KEEP_KEYWORDS):
+        return "foreign_broker_strategy_response"
+
+    if infrastructure_actor and concrete_action and any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["clearing", "settlement", "custody", "market structure", "exchange", "交易", "清算", "交割"]
+    ):
+        return "foreign_broker_new_rule"
+
+    return None
+
+
 def _is_relevant(
     title: str,
     summary: str,
@@ -3299,145 +3575,27 @@ def _is_relevant(
     lower_text = f"{title}\n{summary}".lower()
     lower_url = url.lower()
 
-    strategic_hits = _count_hits(lower_text, STRATEGIC_KEYWORDS)
-    broker_hits = _count_hits(lower_text, BROKERAGE_NAMES)
-    macro_hits = _count_hits(lower_text, MACRO_CONTEXT_KEYWORDS)
-    business_hits = _count_hits(lower_text, BROKERAGE_BUSINESS_KEYWORDS)
-    hard_noise_hit = any(keyword.lower() in lower_text for keyword in HARD_NOISE_KEYWORDS)
-    hard_exclude_hit = any(keyword.lower() in lower_text for keyword in HARD_EXCLUDE_KEYWORDS) or any(
-        pattern.search(f"{title}\n{summary}") for pattern in HARD_EXCLUDE_PATTERNS
-    )
-    preliminary_score = _importance_score(title, summary, source, published_at, include_soft_penalty=False)
-
-    if _is_excluded_source(source):
+    if _is_absolute_noise(lower_title, lower_text, lower_url, source):
         return False
-
-    if any(keyword.lower() in lower_text for keyword in ABSOLUTE_EXCLUDE_KEYWORDS) or any(
-        pattern.search(f"{title}\n{summary}") for pattern in ABSOLUTE_EXCLUDE_PATTERNS
-    ):
+    if _is_wealth_management_main_topic(lower_text):
         return False
-
-    if _is_individual_listing_case(lower_title, lower_text):
+    if _is_stock_or_earnings_or_valuation_content(lower_title, lower_text):
         return False
-
-    if _is_existing_rule_reminder(lower_title, lower_text):
+    if _is_education_or_marketing_content(lower_title, lower_text):
         return False
-
-    if _is_broker_stock_research(lower_title, lower_text):
+    if _is_crypto_noise_without_capital_market_link(lower_text):
         return False
-
-    if _is_trend_analysis_without_new_event(lower_title):
+    if _is_prediction_market_noise(lower_text):
         return False
-
-    if _is_non_financial_regulation_article(lower_title, lower_text, source):
+    if _is_cfd_or_fx_promotion_without_strategy(lower_text):
         return False
-
-    if _is_financial_performance_news(lower_text):
-        return False
-
-    if _is_domestic_brokerage_news(lower_title, lower_text):
-        return False
-
-    if _is_broker_earnings_or_stock_news(lower_text):
-        return False
-
-    if _is_broker_commentary_on_non_broker_industry(lower_title, lower_text):
-        return False
-
-    if _is_individual_trading_status_announcement(lower_text):
-        return False
-
-    if _is_platform_market_recap(lower_title, lower_text, source):
-        return False
-
-    if _is_non_core_crypto_product_news(lower_text):
-        return False
-
-    if _is_unlinked_tier4_news(lower_text):
-        return False
-
-    if _is_low_value_trend_follower(lower_text):
-        return False
-
-    if _is_low_value_regulator_or_market_item(lower_text):
-        return False
-
-    if _is_individual_investor_alert(lower_title, lower_text, lower_url, source):
-        return False
-
-    if _has_individual_alert_signal(lower_text, lower_url) and _has_alert_strategy_exception(lower_text):
-        return True
-
-    if _is_individual_corporate_filing(lower_text):
-        return False
-
-    if _has_corporate_filing_strategy_exception(lower_text):
-        return True
-
-    if hard_noise_hit:
-        return False
-
-    if _is_non_core_virtual_asset_news(lower_text):
-        return False
-
-    product_level = _product_event_level(title, summary, source)
-    if product_level == 0:
-        return False
-    product_strategy_candidate = product_level in {1, 2, 3}
-
-    if _has_emerging_product_signal(lower_text) and not _has_product_strategy_exception(lower_text, source):
-        return False
-
-    tokenization_hit = any(
+    if _is_low_value_trend_follower(lower_text) and not any(
         _contains_keyword(lower_text, keyword)
-        for keyword in ["RWA", "tokenization", "tokenized", "代幣化", "證券型代幣"]
-    )
-    if tokenization_hit and not (
-        _has_capital_market_infrastructure_link(lower_text)
-        or any(_contains_keyword(lower_text, keyword) for keyword in BROKERAGE_CORE_TERMS)
+        for keyword in IMPLEMENTATION_DETAIL_KEYWORDS + ["atomic settlement", "custody", "broker-dealer"]
     ):
         return False
 
-    if _is_investor_or_product_content(lower_text):
-        return False
-
-    if _is_market_price_commentary(lower_text):
-        return False
-
-    if _is_non_focus_product_promotion(lower_title, lower_text, source):
-        return False
-
-    if _is_education_or_profile_content(lower_text):
-        return False
-
-    if product_level not in {2, 3} and _is_non_focus_tech_vendor_article(lower_title, lower_text, source):
-        return False
-
-    if not product_strategy_candidate and not _has_required_focus(lower_title, lower_text, source):
-        return False
-
-    if _is_non_focus_wealth_management(lower_text):
-        return False
-
-    if _is_pure_marketing(lower_text):
-        return False
-
-    if _is_critical_commentary(lower_text):
-        return False
-
-    if hard_exclude_hit and not _has_strong_exception(lower_text):
-        return False
-
-    if broker_hits and business_hits:
-        return True
-
-    if business_hits and macro_hits:
-        return True
-
-    if strategic_hits >= 2 and (macro_hits >= 1 or business_hits >= 1):
-        return True
-
-    return preliminary_score >= PRELIMINARY_SCORE_THRESHOLD
+    return _meeting_theme(title, summary, source) is not None
 
 
 def _is_excluded_source(source: str) -> bool:
@@ -4221,49 +4379,72 @@ def _is_pure_marketing(lower_text: str) -> bool:
     )
 
 
-def _meeting_value_components(title: str, summary: str) -> dict[str, int]:
+def _meeting_value_components(title: str, summary: str, source: str) -> dict[str, int]:
     lower_text = f"{title}\n{summary}".lower()
-    tier = _actor_tier(lower_text)
-    themes = _meeting_themes(title, summary)
+    foreign_broker = any(_contains_keyword(lower_text, name) for name in FOREIGN_ONLINE_BROKER_NAMES)
+    infrastructure_actor = any(_contains_keyword(lower_text, name) for name in MARKET_INFRASTRUCTURE_ACTORS)
 
-    actor_score = {1: 6, 2: 6, 3: 3, 4: 0}.get(tier, 0)
-    action_score = 4 if any(
-        _contains_keyword(lower_text, keyword) for keyword in HIGH_IMPACT_ACTIONS
-    ) else 2 if any(
-        _contains_keyword(lower_text, keyword) for keyword in MEDIUM_IMPACT_ACTIONS
+    actor_score = 8 if foreign_broker or infrastructure_actor else 0
+    source_score = 6 if any(
+        keyword.lower() in source.lower() for keyword in OFFICIAL_SOURCES
+    ) else 5 if any(
+        keyword.lower() in source.lower() for keyword in BROKER_OFFICIAL_SOURCES
+    ) else 3 if any(
+        keyword.lower() in source.lower() for keyword in MAINSTREAM_MEDIA_SOURCES
     ) else 0
-    business_model_score = min(5, _count_contains(lower_text, BROKER_BUSINESS_MODEL_KEYWORDS) * 2)
-    infrastructure_score = 5 if any(
+    action_score = 5 if _count_contains(lower_text, CONCRETE_STRATEGY_ACTION_KEYWORDS) else 0
+    infrastructure_score = 6 if any(
         _contains_keyword(lower_text, keyword)
-        for keyword in [
-            "交易", "清算", "交割", "託管", "後台", "trading", "clearing",
-            "settlement", "custody", "post trade", "market infrastructure",
-        ]
+        for keyword in ["clearing", "settlement", "custody", "broker-dealer", "exchange", "清算", "交割", "託管", "交易所"]
     ) else 0
-    differentiation_score = 4 if _count_contains(lower_text, IMPLEMENTATION_DETAIL_KEYWORDS) else 0
-    if _is_low_value_trend_follower(lower_text):
-        differentiation_score = -6
+    technology_score = 5 if any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["API", "AI agent", "MCP", "order routing", "FIX", "DMA", "下單路由"]
+    ) else 0
+    trading_access_score = 5 if any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["24-hour trading", "23-hour trading", "extended-hours trading", "global trading", "24小時交易", "23小時交易", "延長交易"]
+    ) else 0
+    core_revenue_score = 5 if _count_contains(lower_text, BROKER_CORE_BUSINESS_KEEP_KEYWORDS) else 0
+    innovation_score = 7 if _has_capital_market_tokenization_link(lower_text) else 0
+    prediction_score = 7 if _has_regulated_prediction_market_context(lower_text) else 0
+    infrastructure_business_score = 7 if any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["brokerage infrastructure", "brokerage-as-a-service", "embedded investing", "white-label brokerage"]
+    ) else 0
+    combined_actor_event_score = 8 if (
+        (foreign_broker and _count_contains(lower_text, CONCRETE_STRATEGY_ACTION_KEYWORDS))
+        or (infrastructure_actor and any(_contains_keyword(lower_text, keyword) for keyword in ["rule change", "settlement", "clearing", "新制度", "清算", "交割"]))
+    ) else 0
 
-    taiwan_reference_score = 3 if themes & {
-        "foreign_broker_new_rule",
-        "foreign_broker_strategy_response",
-        "online_broker_focus",
-    } and (
-        business_model_score > 0 or infrastructure_score > 0 or differentiation_score > 0
-    ) else 0
+    noise_penalty = 0
+    if _count_contains(lower_text, PROMOTION_CONTENT_KEYWORDS):
+        noise_penalty -= 10
+    if _count_contains(lower_text, CFD_FX_KEYWORDS) and _count_contains(lower_text, CFD_PROMOTION_KEYWORDS):
+        noise_penalty -= 10
+    if _is_crypto_noise_without_capital_market_link(lower_text):
+        noise_penalty -= 10
+    if _count_contains(lower_text, STOCK_EARNINGS_VALUATION_KEYWORDS) >= 2:
+        noise_penalty -= 10
 
     return {
         "actor_score": actor_score,
+        "source_score": source_score,
         "action_score": action_score,
-        "business_model_score": business_model_score,
         "infrastructure_score": infrastructure_score,
-        "differentiation_score": differentiation_score,
-        "taiwan_reference_score": taiwan_reference_score,
+        "technology_score": technology_score,
+        "trading_access_score": trading_access_score,
+        "core_revenue_score": core_revenue_score,
+        "innovation_score": innovation_score,
+        "prediction_score": prediction_score,
+        "infrastructure_business_score": infrastructure_business_score,
+        "combined_actor_event_score": combined_actor_event_score,
+        "noise_penalty": noise_penalty,
     }
 
 
-def _meeting_value_score(title: str, summary: str) -> int:
-    return sum(_meeting_value_components(title, summary).values())
+def _meeting_value_score(title: str, summary: str, source: str) -> int:
+    return sum(_meeting_value_components(title, summary, source).values())
 
 
 def _importance_score(
@@ -4274,28 +4455,20 @@ def _importance_score(
     *,
     include_soft_penalty: bool = True,
 ) -> float:
-    score = 0.0
-
-    for _, cap, keywords in TOPIC_GROUPS:
-        score += _capped_topic_score(title, summary, keywords, cap)
-
-    score += _action_score(title, summary)
-    score += _product_event_score(title, summary, source)
+    score = float(_meeting_value_score(title, summary, source))
     score += _source_authority_score(source)
     score += _recency_score(published_at)
-    score += _meeting_value_score(title, summary)
 
-    lower_text = f"{title}\n{summary}".lower()
-    if any(name.lower() in lower_text for name in BROKERAGE_NAMES) and any(
-        keyword in lower_text for keyword in ["布局", "佈局", "strategy", "strategic", "launch", "expand", "launches"]
-    ):
-        score += 4
+    theme = _meeting_theme(title, summary, source)
+    if theme in {"foreign_broker_new_rule", "broker_related_financial_innovation"}:
+        score += 5
+    elif theme in {"foreign_broker_strategy_response", "online_broker_focus"}:
+        score += 3
 
     if include_soft_penalty:
         score -= _source_penalty(source)
         score -= _soft_noise_penalty(title, summary)
         score -= _marketing_penalty(title, summary)
-        score -= _wealth_management_penalty(title, summary)
         score -= _investor_alert_penalty(title, summary)
 
     return score
