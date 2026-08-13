@@ -10,10 +10,21 @@ from types import SimpleNamespace
 
 import feedparser
 
+try:
+    import truststore
+except ImportError:  # Keeps pure-rule tests runnable before dependencies are installed.
+    truststore = None
+else:
+    # Use the operating system trust store. This handles publisher sites whose
+    # certificate chains browsers accept but Python's bundled CA file rejects.
+    truststore.inject_into_ssl()
+
 from .models import Article
 from .sources import RSS_SOURCES, NewsSource
 
 ARTICLE_TEXT_CACHE: dict[str, str] = {}
+ARTICLE_HTML_CACHE: dict[str, str] = {}
+ARTICLE_DATE_CACHE: dict[str, datetime | None] = {}
 
 
 HIGH_IMPORTANCE_KEYWORDS = [
@@ -213,12 +224,84 @@ BROKERAGE_NAMES = [
     "Monex",
     "Kiwoom Securities",
     "樂天證券",
-    "元大證券",
-    "富邦證券",
-    "國泰證券",
-    "凱基證券",
-    "永豐金證券",
-    "群益證券",
+]
+
+# Morning-meeting actor tiers. Domestic brokers deliberately stay outside
+# BROKERAGE_NAMES so they do not receive the same weight as foreign peers.
+TIER_1_ONLINE_BROKERS = [
+    "Robinhood", "SoFi", "SoFi Invest", "Webull", "Futu", "富途", "moomoo",
+    "eToro", "Trade Republic", "Scalable Capital", "Trading 212", "DEGIRO",
+    "Wealthsimple", "Zerodha", "Groww", "Upstox", "Angel One",
+    "SBI Securities", "Rakuten Securities", "樂天證券", "Monex", "Alpaca",
+]
+
+TIER_2_MARKET_INFRASTRUCTURE = [
+    "NYSE", "Nasdaq", "LSE", "London Stock Exchange", "ICE", "DTCC",
+    "Euroclear", "Clearstream", "HKEX", "SGX", "JPX", "KRX", "CME",
+    "交易所", "清算機構", "clearing house", "central securities depository",
+]
+
+TIER_3_FINANCIAL_INSTITUTIONS = [
+    "Itaú", "Itau", "JPMorgan", "JP Morgan", "BlackRock", "Citi", "Citigroup",
+    "HSBC", "SBI Group", "AngelList", "CAZ", "Ondo", "Securitize",
+]
+
+TIER_4_CRYPTO_CFD_VENDORS = [
+    "Bybit", "OKX", "Binance", "Libertex", "Devexperts", "TradingView",
+    "CFD broker", "CFD platform", "crypto exchange", "加密交易所",
+]
+
+MEETING_RULE_KEYWORDS = [
+    "T+1", "T+2", "23-hour trading", "23 hour trading", "24-hour trading",
+    "extended-hours trading", "IPO制度", "IPO rules", "複委託", "清算制度",
+    "交割制度", "投資人保護", "investor protection", "market structure",
+    "rule change", "new rule", "新制度", "新規", "監管", "法規",
+]
+
+MEETING_FINANCIAL_INNOVATION_KEYWORDS = [
+    "tokenized securities", "digital securities", "tokenized stocks",
+    "on-chain settlement", "on-chain clearing", "listed venture fund",
+    "listed private markets fund", "private market access", "private markets",
+    "AI 投資助理", "AI投資助理", "AI investing assistant", "RWA",
+    "代幣化證券", "鏈上結算", "鏈上交割", "BDC", "interval fund",
+    "closed-end fund",
+]
+
+BROKER_BUSINESS_MODEL_KEYWORDS = [
+    "brokerage infrastructure", "brokerage-as-a-service", "embedded investing",
+    "API brokerage", "white-label brokerage", "custody", "clearing",
+    "self-clearing", "omnibus account", "securities lending", "stock lending",
+    "margin lending", "cash sweep", "net interest income", "idle cash", "PFOF",
+    "payment for order flow", "subscription", "private markets",
+    "alternative assets", "wealth platform", "multi-asset platform", "super app",
+    "ISA", "retirement account", "fractional shares", "24-hour trading",
+    "extended-hours trading", "prediction markets", "tokenized stocks",
+    "listed private markets fund", "BDC", "interval fund", "closed-end fund",
+    "券商基礎設施", "嵌入式投資", "白牌券商", "自營清算", "證券借貸",
+    "股票借貸", "融資融券", "閒置現金", "私募市場", "另類資產",
+]
+
+TREND_FOLLOWING_KEYWORDS = [
+    "跟進", "配合", "也將支援", "也將提供", "準備跟進", "陸續跟進",
+    "will support", "plans to support", "follow suit", "also plans", "prepare for",
+]
+
+IMPLEMENTATION_DETAIL_KEYWORDS = [
+    "系統改造", "系統升級", "新委託單", "委託單類型", "即時匯兌",
+    "日間美股交易", "延長客服", "人力配置", "交易日切換", "即時庫存",
+    "即時損益", "交割安排", "清算安排", "收費模式", "客戶分眾",
+    "風控機制", "上手券商", "清算機構串接", "system upgrade", "order type",
+    "real-time fx", "daytime us trading", "customer service hours", "staffing",
+    "trade-date transition", "real-time positions", "real-time pnl",
+    "settlement arrangement", "clearing arrangement", "pricing model",
+    "customer segment", "risk control", "clearing integration",
+]
+
+CAPITAL_MARKET_ASSET_KEYWORDS = [
+    "證券", "股票", "債券", "基金", "證券型代幣", "公司行動", "託管",
+    "清算", "交割", "securities", "stocks", "equities", "bond", "bonds",
+    "fund", "funds", "security token", "corporate actions", "custody",
+    "clearing", "settlement",
 ]
 
 DOMESTIC_BROKERAGE_NAMES = [
@@ -1558,7 +1641,6 @@ TOPIC_GROUPS = [
             "機器人理財",
             "web3",
             "RWA",
-            "crypto",
             "tokenization",
             "tokenized securities",
             "digital securities",
@@ -2202,7 +2284,7 @@ PRODUCT_BUSINESS_MODEL_KEYWORDS = [
     "subscription",
     "PFOF",
     "payment for order flow",
-]
+] + BROKER_BUSINESS_MODEL_KEYWORDS
 
 PRODUCT_BUSINESS_ACTION_KEYWORDS = [
     "推出",
@@ -2500,6 +2582,17 @@ def fetch_articles(lookback_hours: int, sources: list[NewsSource] | None = None)
                 stats["irrelevant"] += 1
                 continue
 
+            # Google News occasionally resurfaces old publisher pages with a
+            # fresh RSS timestamp. Prefer the publisher's datePublished value
+            # when available so the lookback window remains a true age filter.
+            if _is_google_news_url(url):
+                page_published_at = _fetch_article_published_datetime(url)
+                if page_published_at is not None:
+                    published_at = page_published_at
+                    if published_at < cutoff:
+                        stats["old"] += 1
+                        continue
+
             score = _importance_score(title, review_summary, source.name, published_at)
             article = Article(
                 title=title,
@@ -2625,6 +2718,22 @@ def _fetch_article_text(url: str) -> str:
     if url in ARTICLE_TEXT_CACHE:
         return ARTICLE_TEXT_CACHE[url]
 
+    html = _fetch_article_html(url)
+    if not html:
+        ARTICLE_TEXT_CACHE[url] = ""
+        return ""
+
+    text = _html_to_article_text(html)
+    ARTICLE_TEXT_CACHE[url] = text
+    return text
+
+
+def _fetch_article_html(url: str) -> str:
+    if not url:
+        return ""
+    if url in ARTICLE_HTML_CACHE:
+        return ARTICLE_HTML_CACHE[url]
+
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -2638,17 +2747,58 @@ def _fetch_article_text(url: str) -> str:
         response = urlopen(Request(url, headers=headers), timeout=8)
         content_type = response.headers.get("Content-Type", "")
         if "html" not in content_type.lower() and "text" not in content_type.lower():
-            ARTICLE_TEXT_CACHE[url] = ""
+            ARTICLE_HTML_CACHE[url] = ""
             return ""
         raw = response.read(350_000)
     except Exception:
-        ARTICLE_TEXT_CACHE[url] = ""
+        ARTICLE_HTML_CACHE[url] = ""
         return ""
 
     html = raw.decode("utf-8", errors="ignore")
-    text = _html_to_article_text(html)
-    ARTICLE_TEXT_CACHE[url] = text
-    return text
+    ARTICLE_HTML_CACHE[url] = html
+    return html
+
+
+def _fetch_article_published_datetime(url: str) -> datetime | None:
+    if url in ARTICLE_DATE_CACHE:
+        return ARTICLE_DATE_CACHE[url]
+
+    published_at = _extract_article_published_datetime(_fetch_article_html(url))
+    ARTICLE_DATE_CACHE[url] = published_at
+    return published_at
+
+
+def _extract_article_published_datetime(html: str) -> datetime | None:
+    if not html:
+        return None
+
+    patterns = [
+        r'["\']datePublished["\']\s*:\s*["\']([^"\']+)',
+        r'<meta[^>]+(?:property|name)=["\']article:published_time["\'][^>]+content=["\']([^"\']+)',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']article:published_time["\']',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, html, re.IGNORECASE)
+        if not match:
+            continue
+        parsed = _parse_page_datetime(match.group(1))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _parse_page_datetime(value: str) -> datetime | None:
+    normalized = unescape(value).strip()
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    except ValueError:
+        return None
 
 
 def _html_to_article_text(html: str) -> str:
@@ -2684,6 +2834,10 @@ def _canonical_url(url: str) -> str:
         return unquote(query_url)
 
     return url.split("?", maxsplit=1)[0]
+
+
+def _is_google_news_url(url: str) -> bool:
+    return "news.google.com/rss/articles/" in url
 
 
 def _dedupe_key(title: str) -> str:
@@ -2778,6 +2932,18 @@ def _is_same_event(article: Article, other: Article) -> bool:
     shared_regions = fp["regions"] & other_fp["regions"]
     shared_actors = fp["actors"] & other_fp["actors"]
     same_day = _same_publication_day(article, other)
+
+    # Google News timestamps can place two local reports of the same event on
+    # adjacent UTC dates.  TDCC corporate-action stories are especially prone
+    # to this, so use a bounded time window instead of strict calendar dates.
+    if (
+        "tdcc" in fp["actors"]
+        and "tdcc" in other_fp["actors"]
+        and "corporate_actions" in shared_topics
+        and shared_topics & {"settlement", "cross_border"}
+        and _within_publication_hours(article, other, 36)
+    ):
+        return True
     same_day_topic_dedupe_topics = {"stock_gift_card", "financial_cyber_ai"}
     strong_event_topics = {
         "stock_gift_card",
@@ -2818,6 +2984,12 @@ def _same_publication_day(article: Article, other: Article) -> bool:
     if not article.published_at or not other.published_at:
         return True
     return article.published_at.date() == other.published_at.date()
+
+
+def _within_publication_hours(article: Article, other: Article, hours: int) -> bool:
+    if not article.published_at or not other.published_at:
+        return True
+    return abs(article.published_at - other.published_at) <= timedelta(hours=hours)
 
 
 def _event_family(article: Article) -> str | None:
@@ -2984,6 +3156,7 @@ def _fingerprint_actors(lower_text: str) -> set[str]:
         "集保結算所",
         "集保結算機構",
         "台美集保",
+        "集保",
     ]
     if any(_contains_keyword(lower_text, alias) for alias in tdcc_aliases):
         actors.add("tdcc")
@@ -3180,6 +3353,12 @@ def _is_relevant(
     if _is_non_core_crypto_product_news(lower_text):
         return False
 
+    if _is_unlinked_tier4_news(lower_text):
+        return False
+
+    if _is_low_value_trend_follower(lower_text):
+        return False
+
     if _is_low_value_regulator_or_market_item(lower_text):
         return False
 
@@ -3207,6 +3386,16 @@ def _is_relevant(
     product_strategy_candidate = product_level in {1, 2, 3}
 
     if _has_emerging_product_signal(lower_text) and not _has_product_strategy_exception(lower_text, source):
+        return False
+
+    tokenization_hit = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["RWA", "tokenization", "tokenized", "代幣化", "證券型代幣"]
+    )
+    if tokenization_hit and not (
+        _has_capital_market_infrastructure_link(lower_text)
+        or any(_contains_keyword(lower_text, keyword) for keyword in BROKERAGE_CORE_TERMS)
+    ):
         return False
 
     if _is_investor_or_product_content(lower_text):
@@ -3541,6 +3730,83 @@ def _is_non_core_crypto_product_news(lower_text: str) -> bool:
     return not _has_core_product_strategy_action(lower_text)
 
 
+def _actor_tier(lower_text: str) -> int | None:
+    for tier, actors in [
+        (1, TIER_1_ONLINE_BROKERS),
+        (2, TIER_2_MARKET_INFRASTRUCTURE),
+        (3, TIER_3_FINANCIAL_INSTITUTIONS),
+        (4, TIER_4_CRYPTO_CFD_VENDORS),
+    ]:
+        if any(_contains_keyword(lower_text, actor) for actor in actors):
+            return tier
+    return None
+
+
+def _meeting_themes(title: str, summary: str) -> set[str]:
+    lower_text = f"{title}\n{summary}".lower()
+    themes: set[str] = set()
+    tier = _actor_tier(lower_text)
+    foreign_broker_context = tier == 1 or any(
+        _contains_keyword(lower_text, keyword) for keyword in BROKERAGE_NAMES
+    )
+    infra_context = tier == 2
+
+    if (foreign_broker_context or infra_context) and _count_contains(lower_text, MEETING_RULE_KEYWORDS):
+        themes.add("foreign_broker_new_rule")
+
+    if _count_contains(lower_text, MEETING_FINANCIAL_INNOVATION_KEYWORDS) and (
+        foreign_broker_context
+        or infra_context
+        or _has_capital_market_infrastructure_link(lower_text)
+    ):
+        themes.add("broker_related_financial_innovation")
+
+    strategy_action = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in HIGH_IMPACT_ACTIONS + MEDIUM_IMPACT_ACTIONS + BROKER_BUSINESS_MODEL_KEYWORDS
+    )
+    if foreign_broker_context and strategy_action:
+        themes.add("foreign_broker_strategy_response")
+
+    if tier == 1:
+        themes.add("online_broker_focus")
+
+    return themes
+
+
+def _has_capital_market_infrastructure_link(lower_text: str) -> bool:
+    institutional_actor = _actor_tier(lower_text) in {1, 2, 3}
+    capital_market_asset = _count_contains(lower_text, CAPITAL_MARKET_ASSET_KEYWORDS) > 0
+    regulatory_or_infra = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in PRODUCT_LEGAL_OPENING_KEYWORDS
+        + PRODUCT_MECHANICS_CHANGE_KEYWORDS
+        + ["央行", "central bank", "監管試點", "regulatory pilot", "協會主導"]
+    )
+    return capital_market_asset and (institutional_actor or regulatory_or_infra)
+
+
+def _is_low_value_trend_follower(lower_text: str) -> bool:
+    following = _count_contains(lower_text, TREND_FOLLOWING_KEYWORDS) > 0
+    if not following:
+        return False
+    return _count_contains(lower_text, IMPLEMENTATION_DETAIL_KEYWORDS) == 0
+
+
+def _is_unlinked_tier4_news(lower_text: str) -> bool:
+    if _actor_tier(lower_text) != 4:
+        return False
+    explicit_broker_link = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "證券帳戶", "券商業務", "受監管商品", "brokerage account",
+            "broker-dealer", "regulated securities", "market infrastructure",
+            "交易所基礎設施",
+        ]
+    )
+    return not (explicit_broker_link or _has_capital_market_infrastructure_link(lower_text))
+
+
 def _has_core_product_strategy_action(lower_text: str) -> bool:
     regulatory_account_access = any(
         _contains_keyword(lower_text, keyword)
@@ -3591,6 +3857,12 @@ def _has_core_product_strategy_action(lower_text: str) -> bool:
 
 def _is_low_value_regulator_or_market_item(lower_text: str) -> bool:
     if not any(_contains_keyword(lower_text, keyword) for keyword in LOW_VALUE_REGULATOR_MARKET_KEYWORDS):
+        return False
+
+    if _count_contains(lower_text, BROKER_BUSINESS_MODEL_KEYWORDS) and any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["regulated securities", "broker-dealer", "clearing", "custody", "omnibus account"]
+    ):
         return False
 
     if any(
@@ -3872,6 +4144,9 @@ def _has_required_focus(lower_title: str, lower_text: str, source: str) -> bool:
     if any(_contains_keyword(lower_title, keyword) for keyword in BROKERAGE_CORE_TERMS):
         return True
 
+    if any(_contains_keyword(lower_title, keyword) for keyword in BROKER_BUSINESS_MODEL_KEYWORDS):
+        return True
+
     specific_market_rule_terms = [
         keyword
         for keyword in MARKET_RULE_CORE_TERMS
@@ -3946,6 +4221,51 @@ def _is_pure_marketing(lower_text: str) -> bool:
     )
 
 
+def _meeting_value_components(title: str, summary: str) -> dict[str, int]:
+    lower_text = f"{title}\n{summary}".lower()
+    tier = _actor_tier(lower_text)
+    themes = _meeting_themes(title, summary)
+
+    actor_score = {1: 6, 2: 6, 3: 3, 4: 0}.get(tier, 0)
+    action_score = 4 if any(
+        _contains_keyword(lower_text, keyword) for keyword in HIGH_IMPACT_ACTIONS
+    ) else 2 if any(
+        _contains_keyword(lower_text, keyword) for keyword in MEDIUM_IMPACT_ACTIONS
+    ) else 0
+    business_model_score = min(5, _count_contains(lower_text, BROKER_BUSINESS_MODEL_KEYWORDS) * 2)
+    infrastructure_score = 5 if any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "交易", "清算", "交割", "託管", "後台", "trading", "clearing",
+            "settlement", "custody", "post trade", "market infrastructure",
+        ]
+    ) else 0
+    differentiation_score = 4 if _count_contains(lower_text, IMPLEMENTATION_DETAIL_KEYWORDS) else 0
+    if _is_low_value_trend_follower(lower_text):
+        differentiation_score = -6
+
+    taiwan_reference_score = 3 if themes & {
+        "foreign_broker_new_rule",
+        "foreign_broker_strategy_response",
+        "online_broker_focus",
+    } and (
+        business_model_score > 0 or infrastructure_score > 0 or differentiation_score > 0
+    ) else 0
+
+    return {
+        "actor_score": actor_score,
+        "action_score": action_score,
+        "business_model_score": business_model_score,
+        "infrastructure_score": infrastructure_score,
+        "differentiation_score": differentiation_score,
+        "taiwan_reference_score": taiwan_reference_score,
+    }
+
+
+def _meeting_value_score(title: str, summary: str) -> int:
+    return sum(_meeting_value_components(title, summary).values())
+
+
 def _importance_score(
     title: str,
     summary: str,
@@ -3963,6 +4283,7 @@ def _importance_score(
     score += _product_event_score(title, summary, source)
     score += _source_authority_score(source)
     score += _recency_score(published_at)
+    score += _meeting_value_score(title, summary)
 
     lower_text = f"{title}\n{summary}".lower()
     if any(name.lower() in lower_text for name in BROKERAGE_NAMES) and any(
@@ -4060,7 +4381,10 @@ def _soft_noise_penalty(title: str, summary: str) -> int:
 
 def _wealth_management_penalty(title: str, summary: str) -> int:
     text = f"{title}\n{summary}".lower()
-    if any(_contains_keyword(text, keyword) for keyword in WEALTH_MANAGEMENT_KEYWORDS):
+    if any(_contains_keyword(text, keyword) for keyword in WEALTH_MANAGEMENT_KEYWORDS) and not (
+        _actor_tier(text) == 1
+        or _count_contains(text, BROKER_BUSINESS_MODEL_KEYWORDS) > 0
+    ):
         return 6
     return 0
 
