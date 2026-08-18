@@ -20,7 +20,7 @@ else:
     truststore.inject_into_ssl()
 
 from .models import Article
-from .sources import RSS_SOURCES, NewsSource
+from .sources import BLOCKED_PUBLISHERS, BLOCKED_PUBLISHER_DOMAINS, RSS_SOURCES, NewsSource
 
 ARTICLE_TEXT_CACHE: dict[str, str] = {}
 ARTICLE_HTML_CACHE: dict[str, str] = {}
@@ -807,6 +807,11 @@ ABSOLUTE_EXCLUDE_PATTERNS = [
         r"(branch opening|new branch|branch network)",
         r"申請加入.*興櫃股票.*推薦證券商",
         r"協辦輔導推薦證券商",
+        r"(smart[- ]contract|智能合約).*(security audit|安全審計)",
+        r"金融科技.*獎.*(金獎|銀獎|獲獎|榮膺)",
+        r"代重要子公司.*公告.*公開收購",
+        r"新股.*暗盤.*(報價|每股|發行價)",
+        r"expands global footprint.*(licen[cs]e|brokerage status)",
     ]
 ]
 
@@ -2655,6 +2660,7 @@ def fetch_articles(lookback_hours: int, sources: list[NewsSource] | None = None)
             "irrelevant": 0,
             "accepted": 0,
         }
+        rejection_reasons: dict[str, int] = {}
         if parsed is not None and getattr(parsed, "bozo", False):
             print(f"Source warning: {source.name} may have a feed issue: {getattr(parsed, 'bozo_exception', 'unknown error')}")
 
@@ -2663,6 +2669,13 @@ def fetch_articles(lookback_hours: int, sources: list[NewsSource] | None = None)
             title = _clean_title(getattr(entry, "title", "").strip())
             if not url or not title or url in seen_urls:
                 stats["invalid"] += 1
+                continue
+
+            publisher = _entry_publisher(entry)
+            source_rejection = _source_exclusion_reason(source.name, publisher, title, url)
+            if source_rejection:
+                stats["irrelevant"] += 1
+                rejection_reasons[source_rejection] = rejection_reasons.get(source_rejection, 0) + 1
                 continue
 
             title_key = _dedupe_key(title)
@@ -2679,8 +2692,12 @@ def fetch_articles(lookback_hours: int, sources: list[NewsSource] | None = None)
             summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
             clean_summary = _clean_summary(summary)
             review_summary = _summary_with_optional_article_text(title, clean_summary, source.name, url)
-            if not _is_relevant(title, review_summary, source.name, published_at, url):
+            rejection_reason = _rejection_reason(
+                title, review_summary, source.name, published_at, url, publisher
+            )
+            if rejection_reason:
                 stats["irrelevant"] += 1
+                rejection_reasons[rejection_reason] = rejection_reasons.get(rejection_reason, 0) + 1
                 continue
 
             # Google News occasionally resurfaces old publisher pages with a
@@ -2715,6 +2732,11 @@ def fetch_articles(lookback_hours: int, sources: list[NewsSource] | None = None)
             f"old={stats['old']}, duplicate={stats['duplicate']}, "
             f"irrelevant={stats['irrelevant']}, invalid={stats['invalid']}"
         )
+        if rejection_reasons:
+            reason_summary = ", ".join(
+                f"{reason}={count}" for reason, count in sorted(rejection_reasons.items())
+            )
+            print(f"Rejected {source.name}: {reason_summary}")
 
     scored_articles = _dedupe_similar_events(scored_articles)
     scored_articles.sort(
@@ -2918,6 +2940,40 @@ def _html_to_article_text(html: str) -> str:
 
 def _clean_title(value: str) -> str:
     return _strip_html(value)
+
+
+def _entry_publisher(entry: object) -> str:
+    entry_source = getattr(entry, "source", None)
+    if isinstance(entry_source, dict):
+        return str(entry_source.get("title", "")).strip()
+    return str(getattr(entry_source, "title", "") or "").strip()
+
+
+def _is_excluded_publisher(publisher: str, title: str = "", url: str = "") -> bool:
+    return _source_exclusion_reason("", publisher, title, url) is not None
+
+
+def _source_exclusion_reason(source: str, publisher: str, title: str = "", url: str = "") -> str | None:
+    identities = (source, publisher)
+    if any(
+        blocked.lower() in identity.lower()
+        for identity in identities
+        for blocked in BLOCKED_PUBLISHERS
+    ):
+        return "blocked_publisher"
+    if _is_excluded_source(source) or _is_excluded_source(publisher):
+        return "excluded_source"
+
+    hostname = (urlparse(url).hostname or "").lower()
+    if any(hostname == domain or hostname.endswith(f".{domain}") for domain in BLOCKED_PUBLISHER_DOMAINS):
+        return "blocked_domain"
+
+    # Google News titles normally end with " - Publisher". This fallback is
+    # needed when an RSS parser does not expose the entry's <source> element.
+    publisher_suffix = title.rsplit(" - ", maxsplit=1)[-1].strip() if " - " in title else ""
+    if publisher_suffix and any(blocked.lower() in publisher_suffix.lower() for blocked in BLOCKED_PUBLISHERS):
+        return "blocked_publisher_suffix"
+    return None
 
 
 def _strip_html(value: str) -> str:
@@ -3404,9 +3460,38 @@ def _is_absolute_noise(lower_title: str, lower_text: str, lower_url: str, source
             _is_individual_corporate_filing(lower_text),
             _is_individual_trading_status_announcement(lower_text),
             _is_non_financial_regulation_article(lower_title, lower_text, source),
+            _is_nonfinancial_company_transaction(lower_text),
             _is_low_value_regulator_or_market_item(lower_text),
         ]
     )
+
+
+def _is_nonfinancial_company_transaction(lower_text: str) -> bool:
+    transaction_hit = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["acquisition", "acquires", "strategic investment", "收購", "併購"]
+    )
+    if not transaction_hit:
+        return False
+
+    nonfinancial_industry_hit = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "cultivated protein", "cultivated-protein", "food platform", "fishway",
+            "食品", "蛋白質", "生技", "電訊", "電信",
+        ]
+    )
+    if not nonfinancial_industry_hit:
+        return False
+
+    capital_market_action = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "brokerage acquisition", "broker-dealer acquisition", "clearing acquisition",
+            "custody acquisition", "券商收購", "證券商收購", "清算業務", "託管業務",
+        ]
+    )
+    return not capital_market_action
 
 
 def _is_wealth_management_main_topic(lower_text: str) -> bool:
@@ -3569,31 +3654,48 @@ def _is_relevant(
     published_at: datetime | None,
     url: str = "",
 ) -> bool:
+    return _rejection_reason(title, summary, source, published_at, url) is None
+
+
+def _rejection_reason(
+    title: str,
+    summary: str,
+    source: str,
+    published_at: datetime | None,
+    url: str = "",
+    publisher: str = "",
+) -> str | None:
+    source_rejection = _source_exclusion_reason(source, publisher, title, url)
+    if source_rejection:
+        return source_rejection
+
     lower_title = title.lower()
     lower_text = f"{title}\n{summary}".lower()
     lower_url = url.lower()
 
     if _is_absolute_noise(lower_title, lower_text, lower_url, source):
-        return False
+        return "absolute_noise"
     if _is_wealth_management_main_topic(lower_text):
-        return False
+        return "wealth_management_main_topic"
     if _is_stock_or_earnings_or_valuation_content(lower_title, lower_text):
-        return False
+        return "stock_earnings_or_valuation"
     if _is_education_or_marketing_content(lower_title, lower_text):
-        return False
+        return "education_or_marketing"
     if _is_crypto_noise_without_capital_market_link(lower_text):
-        return False
+        return "unlinked_crypto"
     if _is_prediction_market_noise(lower_text):
-        return False
+        return "prediction_market_noise"
     if _is_cfd_or_fx_promotion_without_strategy(lower_text):
-        return False
+        return "cfd_or_fx_promotion"
     if _is_low_value_trend_follower(lower_text) and not any(
         _contains_keyword(lower_text, keyword)
         for keyword in IMPLEMENTATION_DETAIL_KEYWORDS + ["atomic settlement", "custody", "broker-dealer"]
     ):
-        return False
+        return "trend_following_without_detail"
 
-    return _meeting_theme(title, summary, source) is not None
+    if _meeting_theme(title, summary, source) is None:
+        return "no_meeting_theme"
+    return None
 
 
 def _is_excluded_source(source: str) -> bool:

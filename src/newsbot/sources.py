@@ -10,6 +10,12 @@ class NewsSource:
     url: str
 
 
+# Source policy is kept beside source definitions so removing a publisher means
+# both "do not query it" and "reject it when another Google News query returns it".
+BLOCKED_PUBLISHERS = ("MoneyDJ", "moomoo")
+BLOCKED_PUBLISHER_DOMAINS = ("moneydj.com", "moomoo.com")
+
+
 def google_news_source(name: str, query: str, *, lang: str = "zh-TW", region: str = "TW") -> NewsSource:
     encoded_query = quote_plus(f"({query}) when:1d")
     ceid_lang = "zh-Hant" if lang == "zh-TW" else lang.split("-", maxsplit=1)[0]
