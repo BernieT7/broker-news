@@ -1908,7 +1908,6 @@ BROKER_OFFICIAL_SOURCES = [
 MAINSTREAM_MEDIA_SOURCES = [
     "工商時報",
     "經濟日報",
-    "MoneyDJ",
     "鉅亨",
     "日經",
     "Reuters",
@@ -1954,7 +1953,6 @@ EXCLUDED_SOURCES = [
 ]
 
 SOURCE_PENALTIES = {
-    "moomoo": 4,
     "Yahoo Finance": 2,
 }
 

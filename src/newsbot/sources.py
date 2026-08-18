@@ -25,7 +25,6 @@ RSS_SOURCES: list[NewsSource] = [
     NewsSource("櫃買中心新聞", "https://www.tpex.org.tw/web/about/news/news/rss.php"),
     google_news_source("工商時報", "site:ctee.com.tw 券商 OR 證券商 OR 金管會 OR 交易制度 OR 零股 OR 複委託"),
     google_news_source("經濟日報", "site:money.udn.com 券商 OR 證券商 OR 金管會 OR 交易制度 OR 零股 OR 複委託"),
-    google_news_source("MoneyDJ", "site:moneydj.com 券商 OR 證券商 OR 金管會 OR 交易制度 OR 零股 OR 複委託"),
     google_news_source("鉅亨網", "site:cnyes.com 券商 OR 證券商 OR 金管會 OR 交易制度 OR 零股 OR 複委託"),
     google_news_source("日經", "site:nikkei.com OR site:asia.nikkei.com brokerage strategy OR securities industry OR retail brokerage", lang="en-US", region="US"),
     google_news_source("韓國金融監理院", "site:fss.or.kr securities company OR capital market OR brokerage OR investor protection", lang="en-US", region="KR"),
@@ -136,7 +135,7 @@ RSS_SOURCES: list[NewsSource] = [
     ),
     google_news_source(
         "亞太網路券商官方新聞",
-        "site:futuholdings.com OR site:moomoo.com OR site:sbisec.co.jp OR site:rakuten-sec.co.jp OR site:monexgroup.jp "
+        "site:futuholdings.com OR site:sbisec.co.jp OR site:rakuten-sec.co.jp OR site:monexgroup.jp "
         "launch OR partnership OR market OR trading OR settlement",
         lang="en-US",
         region="US",
