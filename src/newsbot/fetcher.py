@@ -243,7 +243,7 @@ TIER_2_MARKET_INFRASTRUCTURE = [
 
 TIER_3_FINANCIAL_INSTITUTIONS = [
     "Itaú", "Itau", "JPMorgan", "JP Morgan", "BlackRock", "Citi", "Citigroup",
-    "HSBC", "SBI Group", "AngelList", "CAZ", "Ondo", "Securitize",
+    "花旗", "HSBC", "SBI Group", "AngelList", "CAZ", "Ondo", "Securitize",
 ]
 
 TIER_4_CRYPTO_CFD_VENDORS = [
@@ -302,6 +302,44 @@ CAPITAL_MARKET_ASSET_KEYWORDS = [
     "清算", "交割", "securities", "stocks", "equities", "bond", "bonds",
     "fund", "funds", "security token", "corporate actions", "custody",
     "clearing", "settlement",
+]
+
+# A named financial company and a generic action such as "acquisition" are
+# not enough to make an article useful for the brokerage morning meeting.  At
+# least one concrete capital-markets object must be present.  Generic custody
+# is deliberately omitted because crypto custody and wallet press releases are
+# common false positives; the institutional custody-platform exception below
+# handles genuine securities-servicing strategy.
+CAPITAL_MARKET_EVENT_OBJECT_KEYWORDS = [
+    "券商", "證券商", "證券帳戶", "券商帳戶", "複委託", "資本市場",
+    "證券", "股票", "債券", "基金", "ETF", "交易制度", "交易所",
+    "撮合", "清算", "交割", "公司行動", "市場資料", "下單路由",
+    "broker", "brokerage", "broker-dealer", "brokerage account",
+    "securities", "stocks", "equities", "bond", "bonds", "fund", "funds",
+    "capital market", "trading platform", "trading venue", "stock exchange",
+    "securities exchange", "clearing", "settlement", "corporate actions",
+    "market data", "order routing", "best execution", "FIX", "DMA", "OMS", "EMS",
+]
+
+INSTITUTIONAL_CUSTODY_PLATFORM_KEYWORDS = [
+    "investor services", "securities services", "asset servicing",
+    "custody processing", "custody platform", "custody+",
+    "機構託管平台", "證券服務", "資產服務", "託管處理", "託管服務平台",
+]
+
+NONFINANCIAL_ACQUISITION_TARGET_KEYWORDS = [
+    "cultivated protein", "cultivated-protein", "food platform", "fishway",
+    "animal feed", "pet food", "feed ingredients", "food ingredients",
+    "materials distribution", "telecommunications", "software company",
+    "食品", "蛋白質", "生技", "電訊", "電信", "動物飼料", "寵物食品",
+    "飼料原料", "食品原料", "材料經銷",
+]
+
+EXPLICIT_TOKENIZED_CAPITAL_MARKET_KEYWORDS = [
+    "tokenized securities", "tokenized stocks", "tokenized equities",
+    "tokenized bonds", "tokenized funds", "digital securities",
+    "securities token", "security token", "代幣化證券", "代幣化股票",
+    "代幣化債券", "代幣化基金", "數位證券", "證券型代幣",
 ]
 
 FOREIGN_ONLINE_BROKER_NAMES = [
@@ -2739,11 +2777,33 @@ def fetch_articles(lookback_hours: int, sources: list[NewsSource] | None = None)
             print(f"Rejected {source.name}: {reason_summary}")
 
     scored_articles = _dedupe_similar_events(scored_articles)
+    # A run can spend substantial time fetching and resolving publisher pages.
+    # Re-evaluate the rolling window immediately before output so an article
+    # that crossed the boundary during the run cannot leak into the digest.
+    scored_articles = _filter_final_lookback(scored_articles, lookback_hours)
     scored_articles.sort(
         key=lambda item: (item[0], item[1].published_at or datetime.min.replace(tzinfo=UTC)),
         reverse=True,
     )
     return [article for _, article in scored_articles]
+
+
+def _filter_final_lookback(
+    scored_articles: list[tuple[int, Article]],
+    lookback_hours: int,
+    *,
+    now: datetime | None = None,
+) -> list[tuple[int, Article]]:
+    final_cutoff = (now or datetime.now(UTC)) - timedelta(hours=lookback_hours)
+    retained = [
+        item
+        for item in scored_articles
+        if item[1].published_at is None or item[1].published_at >= final_cutoff
+    ]
+    expired_count = len(scored_articles) - len(retained)
+    if expired_count:
+        print(f"Removed {expired_count} articles outside the final rolling lookback window.")
+    return retained
 
 
 def _dtcc_press_room_entries(url: str) -> list[SimpleNamespace]:
@@ -3180,7 +3240,7 @@ def _same_specific_actor(article: Article, other: Article) -> bool:
 def _specific_actor_tokens(article: Article) -> set[str]:
     text = f"{article.title}\n{article.summary}".lower()
     actors: set[str] = set()
-    specific_keywords = BROKERAGE_NAMES + OFFICIAL_SOURCES + [
+    specific_keywords = BROKERAGE_NAMES + TIER_3_FINANCIAL_INSTITUTIONS + OFFICIAL_SOURCES + [
         "Solana",
         "貝萊德",
         "摩根大通",
@@ -3320,6 +3380,7 @@ def _fingerprint_actors(lower_text: str) -> set[str]:
 
     actor_keywords = (
         BROKERAGE_NAMES
+        + TIER_3_FINANCIAL_INSTITUTIONS
         + OFFICIAL_SOURCES
         + [
             "貝萊德",
@@ -3442,6 +3503,11 @@ def _event_key(title: str) -> str | None:
     if "中國信託證券" in title and "複委託" in title:
         return "ctbc_securities_sub_brokerage_campaign"
 
+    if ("citi" in lower_title or "citigroup" in lower_title or "花旗" in title) and (
+        "custody+" in lower_title or "custody +" in lower_title or "託管服務" in title
+    ):
+        return "citi_custody_plus"
+
     return None
 
 
@@ -3476,10 +3542,7 @@ def _is_nonfinancial_company_transaction(lower_text: str) -> bool:
 
     nonfinancial_industry_hit = any(
         _contains_keyword(lower_text, keyword)
-        for keyword in [
-            "cultivated protein", "cultivated-protein", "food platform", "fishway",
-            "食品", "蛋白質", "生技", "電訊", "電信",
-        ]
+        for keyword in NONFINANCIAL_ACQUISITION_TARGET_KEYWORDS
     )
     if not nonfinancial_industry_hit:
         return False
@@ -3524,19 +3587,62 @@ def _is_education_or_marketing_content(lower_title: str, lower_text: str) -> boo
 
 
 def _has_capital_market_tokenization_link(lower_text: str) -> bool:
-    direct_link = _count_contains(lower_text, CAPITAL_MARKET_TOKENIZATION_KEYWORDS) > 0
-    actor_link = any(
-        _contains_keyword(lower_text, actor)
-        for actor in FOREIGN_ONLINE_BROKER_NAMES + MARKET_INFRASTRUCTURE_ACTORS + ["Securitize"]
-    )
+    # "custody", "clearing" or "settlement" alone do not prove that a crypto
+    # story has entered capital-market infrastructure.  Require an explicit
+    # tokenized security or a tokenization term paired with a security asset.
+    direct_link = _count_contains(lower_text, EXPLICIT_TOKENIZED_CAPITAL_MARKET_KEYWORDS) > 0
     asset_and_tokenization = any(
         _contains_keyword(lower_text, token_word)
         for token_word in ["tokenization", "tokenized", "RWA", "代幣化"]
     ) and any(
         _contains_keyword(lower_text, asset)
-        for asset in ["stocks", "equities", "bonds", "funds", "ETF", "股票", "債券", "基金", "證券"]
+        for asset in [
+            "stock", "stocks", "equity", "equities", "bond", "bonds",
+            "fund", "funds", "security", "securities", "ETF",
+            "股票", "債券", "基金", "證券",
+        ]
     )
-    return direct_link or (actor_link and asset_and_tokenization)
+    # A concrete security asset paired with tokenization is sufficient even
+    # when the issuer is new and therefore absent from the actor allow-list.
+    # The actor check remains useful documentation of the intended context but
+    # must not turn the actor list into a hidden allow-list.
+    return direct_link or asset_and_tokenization
+
+
+def _has_institutional_custody_platform_strategy(lower_text: str) -> bool:
+    institutional_actor = _actor_tier(lower_text) == 3
+    platform_detail = _count_contains(lower_text, INSTITUTIONAL_CUSTODY_PLATFORM_KEYWORDS) > 0
+    concrete_action = _count_contains(lower_text, CONCRETE_STRATEGY_ACTION_KEYWORDS) > 0
+    return institutional_actor and platform_detail and concrete_action
+
+
+def _has_regulated_broker_dealer_event(lower_text: str) -> bool:
+    broker_dealer = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in ["broker-dealer", "broker dealer", "證券商執照", "券商執照"]
+    )
+    regulated_action = any(
+        _contains_keyword(lower_text, keyword)
+        for keyword in [
+            "license", "licence", "licensed", "approval", "approved", "regulator",
+            "regulatory approval", "取得執照", "核准", "監管機構",
+        ]
+    )
+    return broker_dealer and regulated_action
+
+
+def _has_capital_market_event_object(lower_text: str) -> bool:
+    if _count_contains(lower_text, CAPITAL_MARKET_EVENT_OBJECT_KEYWORDS):
+        return True
+    if _has_capital_market_tokenization_link(lower_text):
+        return True
+    if _has_institutional_custody_platform_strategy(lower_text):
+        return True
+    if _has_regulated_broker_dealer_event(lower_text):
+        return True
+    if _has_regulated_prediction_market_context(lower_text):
+        return True
+    return False
 
 
 def _is_crypto_noise_without_capital_market_link(lower_text: str) -> bool:
@@ -3557,6 +3663,10 @@ def _is_crypto_noise_without_capital_market_link(lower_text: str) -> bool:
         for keyword in ["regulated market", "brokerage account", "multi-asset trading platform", "market entry"]
     )
     if foreign_broker_strategy:
+        return False
+    if _has_institutional_custody_platform_strategy(lower_text):
+        return False
+    if _has_regulated_broker_dealer_event(lower_text):
         return False
     return not _has_capital_market_tokenization_link(lower_text)
 
@@ -3620,6 +3730,7 @@ def _meeting_theme(title: str, summary: str, source: str) -> str | None:
     if innovation_hit and (
         _has_capital_market_tokenization_link(lower_text)
         or _has_regulated_prediction_market_context(lower_text)
+        or _has_institutional_custody_platform_strategy(lower_text)
         or foreign_broker
         or infrastructure_actor
     ):
@@ -3635,7 +3746,22 @@ def _meeting_theme(title: str, summary: str, source: str) -> str | None:
     if online_broker and concrete_action:
         return "online_broker_focus"
 
-    if concrete_action and _count_contains(lower_text, CFD_STRATEGY_KEEP_KEYWORDS):
+    if _has_regulated_broker_dealer_event(lower_text):
+        return "foreign_broker_strategy_response"
+
+    infrastructure_business_terms = [
+        "brokerage infrastructure", "brokerage-as-a-service", "embedded investing",
+        "API brokerage", "white-label brokerage", "broker infrastructure provider",
+        "券商基礎設施", "嵌入式投資", "白牌券商",
+    ]
+    if concrete_action and _count_contains(lower_text, infrastructure_business_terms):
+        return "foreign_broker_strategy_response"
+
+    if (
+        concrete_action
+        and _count_contains(lower_text, CFD_FX_KEYWORDS)
+        and _count_contains(lower_text, CFD_STRATEGY_KEEP_KEYWORDS)
+    ):
         return "foreign_broker_strategy_response"
 
     if infrastructure_actor and concrete_action and any(
@@ -3692,6 +3818,9 @@ def _rejection_reason(
         for keyword in IMPLEMENTATION_DETAIL_KEYWORDS + ["atomic settlement", "custody", "broker-dealer"]
     ):
         return "trend_following_without_detail"
+
+    if not _has_capital_market_event_object(lower_text):
+        return "missing_capital_market_object"
 
     if _meeting_theme(title, summary, source) is None:
         return "no_meeting_theme"
